@@ -179,6 +179,17 @@
   <!-- ============ LEFT: SPEC ============ -->
   <div class="panel left">
     <div class="grp">
+      <p class="eyebrow">Project</p>
+      <div class="row">
+        <button class="btn ghost" id="saveProj" style="margin-bottom:0">Save project</button>
+        <button class="btn ghost" id="loadProj" style="margin-bottom:0">Load project</button>
+      </div>
+      <input type="file" id="projFile" accept=".json,application/json" hidden>
+      <div class="notice" id="projStatus"></div>
+      <p class="mini" style="margin-top:8px">Saves the full design + image to a portable <span class="mono">.coverforge.json</span> file. Work also auto-saves in this browser and restores on reload.</p>
+    </div>
+
+    <div class="grp">
       <p class="eyebrow">Book spec</p>
 
       <label class="fld">

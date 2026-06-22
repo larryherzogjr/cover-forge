@@ -29,7 +29,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 
 ## M3 — Workflow & server features (Tier 3)
 
-- [ ] **Project save/load** as portable JSON (serialize `S`, including image as data URL or a referenced asset). Export/import buttons. (Browser storage is fine when self-hosted; the JSON file is the portable path.)
+- [x] **Project save/load** as portable JSON (`serialize`/`restore` in state.js; image embedded as a data URL). Save/Load buttons download/read a `.coverforge.json` file, and work auto-saves to localStorage and restores on reload. `restore` deep-merges so control bindings keep their object references.
 - [ ] **Background removal**: `/api/remove-bg` with rembg/BiRefNet on the local GPU box; wire a "Remove background" action on the uploaded image; result becomes an overlay layer.
 - [ ] **Hardcover mode**: implement case-laminate spine/hinge/wrap math from `docs/KDP_SPEC.md` — verify every number against KDP's calculator first; add a binding toggle.
 - [ ] **Font-load hardening**: `await document.fonts.load(...)` for all selected faces before any export.

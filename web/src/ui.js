@@ -3,7 +3,7 @@
 // geometry lives in kdp.js; pixels in render.js; this module connects controls
 // to state and re-renders.
 
-import { S } from "./state.js";
+import { S, serialize, restore, AUTOSAVE_KEY } from "./state.js";
 import {
   dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
@@ -16,10 +16,27 @@ const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const cv = $("preview");
 
-// Single render funnel: redraw the canvas, then refresh the pre-flight notices.
+// Single render funnel: redraw the canvas, refresh notices, schedule an autosave.
 function rerender() {
   render();
   updateNotices();
+  autosave();
+}
+
+/* ---------- autosave to localStorage (restores on reload) ---------- */
+let booted = false;        // gate autosave until any boot-restore finishes
+let _saveTimer = null;
+function autosave() {
+  if (!booted) return;
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serialize()));
+    } catch (_) {
+      // quota (large image) — keep at least the design without the image
+      try { const j = serialize(); j.image = null; localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(j)); } catch (__) { /* give up */ }
+    }
+  }, 600);
 }
 
 /* ---------- pre-flight notices (effective DPI + CMYK gamut) ---------- */
@@ -374,8 +391,133 @@ book.addEventListener("pointerdown", (e) => { dragging = true; lastX = e.clientX
 book.addEventListener("pointermove", (e) => { if (!dragging) return; rotateBy(e.clientX - lastX, e.clientY - lastY); lastX = e.clientX; lastY = e.clientY; });
 book.addEventListener("pointerup", () => { dragging = false; });
 
+/* ---------- project save / load + control sync ---------- */
+const sv = (id, v) => { const e = $(id); if (e) e.value = v; };
+const svl = (id, labId, v, fmt) => { sv(id, v); const l = $(labId); if (l) l.textContent = fmt ? fmt(v) : v; };
+const schk = (id, b) => { const e = $(id); if (e) e.checked = !!b; };
+const scol = (id, labId, v) => { sv(id, v); const l = $(labId); if (l) l.textContent = v; };
+const sseg = (sel, attr, val) => document.querySelectorAll(sel + " button").forEach((b) => b.classList.toggle("on", b.dataset[attr] === String(val)));
+
+function syncBlock(prefix, key) {
+  const o = S[key];
+  sv(prefix + "Text", o.text); sv(prefix + "Font", o.font);
+  svl(prefix + "Size", prefix + "SizeL", o.size, (v) => v + " pt");
+  scol(prefix + "Color", prefix + "ColorL", o.color);
+  schk(prefix + "Caps", o.caps);
+}
+
+// Push the entire S object out to every control (after a project load/restore).
+function syncUI() {
+  const trimVal = `${S.trimW},${S.trimH}`;
+  const hasOpt = [...$("trim").options].some((o) => o.value === trimVal);
+  $("trim").value = hasOpt ? trimVal : "custom";
+  $("customWrap").style.display = hasOpt ? "none" : "flex";
+  sv("cw", S.trimW); sv("ch", S.trimH);
+  sv("pages", S.pages); sv("paper", String(S.paper));
+
+  sseg("#bgModeSeg", "bg", S.bgMode);
+  $("solidWrap").style.display = S.bgMode === "solid" ? "block" : "none";
+  $("gradWrap").style.display = S.bgMode === "gradient" ? "block" : "none";
+  scol("bgColor", "bgColorL", S.bg);
+  scol("gradFrom", "gradFromL", S.gradient.from);
+  scol("gradTo", "gradToL", S.gradient.to);
+  svl("gradAngle", "gradAngleL", S.gradient.angle, (v) => v + "°");
+
+  sseg("#fitSeg", "fit", S.fit);
+  svl("opacity", "opL", Math.round(S.imgOpacity * 100), (v) => v + "%");
+  sv("imgBlend", S.imgBlend);
+  svl("scale", "scaleL", Math.round(S.imgScale * 100), (v) => v + "%");
+
+  sv("tTitle", S.title.text); sv("tFont", S.title.font);
+  svl("tSize", "tSizeL", S.title.size, (v) => v + " pt");
+  svl("tY", "tYL", Math.round(S.title.y), (v) => v + "%");
+  scol("tColor", "tColorL", S.title.color);
+  schk("tCaps", S.title.caps);
+  svl("tLs", "tLsL", S.title.letterSpacing); svl("tLh", "tLhL", S.title.lineHeight);
+  scol("tStrokeC", "tStrokeCL", S.title.stroke.color);
+  svl("tStrokeW", "tStrokeWL", S.title.stroke.width, (v) => v + " pt");
+  schk("tShadow", S.title.shadow);
+  $("tShadowAdv").style.display = S.title.shadow ? "block" : "none";
+  svl("tShBlur", "tShBlurL", S.title.shadowBlur, (v) => v + " pt");
+  svl("tShDX", "tShDXL", S.title.shadowDX); svl("tShDY", "tShDYL", S.title.shadowDY);
+  svl("tShOp", "tShOpL", Math.round((S.title.shadowOpacity ?? 0.45) * 100), (v) => v + "%");
+
+  sv("aText", S.author.text); sv("aFont", S.author.font);
+  svl("aSize", "aSizeL", S.author.size, (v) => v + " pt");
+  svl("aY", "aYL", Math.round(S.author.y), (v) => v + "%");
+  scol("aColor", "aColorL", S.author.color);
+  schk("aCaps", S.author.caps); svl("aLs", "aLsL", S.author.letterSpacing);
+  scol("aStrokeC", "aStrokeCL", S.author.stroke.color);
+  svl("aStrokeW", "aStrokeWL", S.author.stroke.width, (v) => v + " pt");
+
+  syncBlock("sub", "subtitle"); syncBlock("ser", "series"); syncBlock("pq", "pullquote");
+
+  sv("sText", S.spine.text); scol("sColor", "sColorL", S.spine.color); schk("sFlip", S.spine.flip);
+
+  sv("bText", S.back.text); sv("bFont", S.back.font);
+  svl("bSize", "bSizeL", S.back.size, (v) => v + " pt");
+  svl("bY", "bYL", Math.round(S.back.y), (v) => v + "%");
+  svl("bLh", "bLhL", S.back.lineHeight);
+  sseg("#bAlignSeg", "align", S.back.align);
+  scol("bColor", "bColorL", S.back.color);
+
+  schk("guides", S.guides);
+  sseg("#viewSeg", "view", S.view);
+  $("view2d").style.display = S.view === "2d" ? "block" : "none";
+  $("view3d").style.display = S.view === "3d" ? "block" : "none";
+  $("opL").textContent = Math.round(S.imgOpacity * 100) + "%";
+  $("zlabel").textContent = S.zoom ? ("+" + S.zoom) : "fit";
+
+  updateReadout();
+  rerender();
+}
+
+const setProjStatus = (sev, msg) => setNotice($("projStatus"), sev, msg);
+
+function downloadJSON(obj, name) {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+  const u = URL.createObjectURL(blob); const a = document.createElement("a");
+  a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000);
+}
+function projectFileName() {
+  const t = (S.title.text || "cover").trim().replace(/[^\w]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  return (t || "cover") + ".coverforge.json";
+}
+
+// Apply a parsed project: design fields synchronously, image asynchronously.
+async function applyProject(parsed) {
+  const dataUrl = restore(parsed);
+  if (dataUrl) {
+    await new Promise((res) => { const im = new Image(); im.onload = () => { S.img = im; res(); }; im.onerror = res; im.src = dataUrl; });
+    if (S.img) { $("thumb").classList.add("show"); $("thumbImg").src = dataUrl; cv.style.cursor = "grab"; extractPalette(S.img); }
+  } else {
+    $("thumb").classList.remove("show"); S.palette = []; renderSwatches(); cv.style.cursor = "default";
+  }
+  syncUI();
+}
+function loadProjectFile(f) {
+  const r = new FileReader();
+  r.onload = () => {
+    try { applyProject(JSON.parse(r.result)); setProjStatus("ok", "Project loaded."); }
+    catch (err) { setProjStatus("bad", "Could not load: " + err.message); }
+  };
+  r.onerror = () => setProjStatus("bad", "Could not read the file.");
+  r.readAsText(f);
+}
+$("saveProj").onclick = () => { downloadJSON(serialize(), projectFileName()); setProjStatus("ok", "Project saved to your downloads."); };
+$("loadProj").onclick = () => $("projFile").click();
+$("projFile").onchange = (e) => { const f = e.target.files[0]; if (f) loadProjectFile(f); e.target.value = ""; };
+
 /* ---------- boot ---------- */
-updateReadout();
-ensureFontsLoaded().then(rerender);
+async function boot() {
+  try {
+    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    if (raw) await applyProject(JSON.parse(raw)); // restores last session
+  } catch (_) { /* ignore a corrupt autosave */ }
+  booted = true; // autosave enabled only after restore settles (no clobber)
+  updateReadout();
+  ensureFontsLoaded().then(rerender);
+  setTimeout(rerender, 300);
+}
 window.addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(rerender, 120); });
-setTimeout(rerender, 300);
+boot();

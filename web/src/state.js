@@ -39,3 +39,48 @@ export const S = {
   guides: true, view: "2d", zoom: 0, // zoom 0 = fit
   selected: null, // id of the currently-selected draggable block ("title"|"author"|null)
 };
+
+/* ---------- project save / load (portable JSON) ---------- */
+
+export const PROJECT_VERSION = 1;
+export const AUTOSAVE_KEY = "cover-forge:autosave";
+
+// A JSON-serializable snapshot of the whole design. The live Image is stored as
+// its data URL under `image`; everything else is plain data.
+export function serialize() {
+  const { img, ...rest } = S;
+  return {
+    app: "cover-forge",
+    version: PROJECT_VERSION,
+    savedAt: new Date().toISOString(),
+    state: rest,
+    image: img ? img.src : null,
+  };
+}
+
+// Deep-merge src INTO target, mutating existing nested objects in place rather
+// than replacing them. This is essential: UI control bindings capture references
+// to S's nested objects (S.title, S.gradient, S.title.stroke, …), so a load must
+// not swap those objects out or the controls would silently disconnect.
+function deepMerge(target, src) {
+  for (const k of Object.keys(src)) {
+    const v = src[k], cur = target[k];
+    if (v && typeof v === "object" && !Array.isArray(v) && cur && typeof cur === "object" && !Array.isArray(cur)) {
+      deepMerge(cur, v);
+    } else {
+      target[k] = v;
+    }
+  }
+}
+
+// Apply a parsed project into S (design fields only). Returns the image data
+// URL (or null) for the caller to load asynchronously. Throws if it isn't ours.
+export function restore(obj) {
+  if (!obj || obj.app !== "cover-forge" || typeof obj.state !== "object" || !obj.state) {
+    throw new Error("not a Cover Forge project file");
+  }
+  deepMerge(S, obj.state);
+  S.img = null;
+  S.selected = null;
+  return obj.image || null;
+}

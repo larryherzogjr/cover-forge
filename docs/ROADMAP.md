@@ -21,7 +21,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 ## M2 — Design parity (Tier 2, all client-side)
 
 - [x] Free **drag-positioning** for the front title/author (click to select, drag to move, snaps to the safe-area guides; `x` = horizontal-center fraction, `y` = vertical-center percent, both resolution-independent). Hit-testing + selection outline in `render.js`; `FRONT_BLOCKS` is the seam for adding more draggable blocks.
-- [~] Additional text blocks: front **subtitle, series, pull-quote** done (optional, draggable, same style controls). Back tagline + author bio still TODO (need back-side drag-positioning).
+- [x] Additional text blocks: front **subtitle, series, pull-quote** and back **tagline, author bio** — all optional, draggable/nudgeable, same style controls. Back blocks position against the back panel (`BACK_BLOCKS` in render.js; drag uses the back-panel origin).
 - [x] Text controls: stroke/outline, letter-spacing, line-height, all-caps toggle, shadow tuning (offset/blur/opacity). Title gets the full set; author gets caps/letter-spacing/outline; back gets line-height.
 - [x] **Solid + gradient** background mode (no image required). Two-stop linear gradient at an adjustable angle (`kdp.gradientLine`).
 - [x] Image **blend modes** (normal/multiply/screen/overlay/darken/lighten) via `globalCompositeOperation`. (RGB color grading still TODO.)

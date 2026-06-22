@@ -497,6 +497,34 @@
     </div>
 
     <div class="grp">
+      <p class="eyebrow">Back tagline <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
+      <label class="fld"><textarea id="tagText" rows="2" placeholder="A one-line hook for the back"></textarea></label>
+      <label class="fld">
+        <select id="tagFont">
+          <optgroup label="Sans / display"><option selected>Montserrat</option><option>Oswald</option><option>Bebas Neue</option><option>Archivo Black</option></optgroup>
+          <optgroup label="Serif"><option>Cormorant Garamond</option><option>EB Garamond</option><option>Playfair Display</option><option>Libre Baskerville</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="tagSizeL" class="mono"></b></span><input type="range" id="tagSize" min="9" max="44" value="18"></label>
+      <div class="colorrow"><input type="color" id="tagColor" value="#c6a75e"><span class="mono" id="tagColorL">#c6a75e</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tagCaps"> all caps</label></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Author bio <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
+      <label class="fld"><textarea id="bioText" rows="3" placeholder="Short author bio for the back"></textarea></label>
+      <label class="fld">
+        <select id="bioFont">
+          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
+          <optgroup label="Sans"><option>Montserrat</option><option>Oswald</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="bioSizeL" class="mono"></b></span><input type="range" id="bioSize" min="8" max="24" value="12"></label>
+      <div class="colorrow"><input type="color" id="bioColor" value="#cdbf9f"><span class="mono" id="bioColorL">#cdbf9f</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="bioCaps"> all caps</label></div>
+    </div>
+
+    <div class="grp">
       <p class="eyebrow">Pre-flight</p>
       <div class="notice" id="cmykNote"></div>
       <p class="mini" id="preflightOk" style="margin-top:8px">Colors look print-safe. On-screen RGB still shifts on press — order a proof.</p>

@@ -21,14 +21,17 @@ export const getPrevScale = () => PREV_SCALE;
 // (preview-scale px) are recorded during the live render so ui.js can hit-test
 // pointer events against them. Add a block here + in state.js to make it real.
 export const FRONT_BLOCKS = ["series", "title", "subtitle", "pullquote", "author"];
+export const BACK_BLOCKS = ["tagline", "bio"];
+const TEXT_BLOCKS = [...FRONT_BLOCKS, ...BACK_BLOCKS];
+export const isBackBlock = (token) => BACK_BLOCKS.includes(token);
 const hitBoxes = {};                 // token -> {x,y,w,h} (preview px)
 export const getHitBox = (token) => hitBoxes[token];
 const inBox = (b, px, py) => b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
-// Selection hit-test: front text blocks first (drawn on top), then overlays.
+// Selection hit-test: text blocks first (drawn on top), then overlays.
 // Returns a token: a block id ("title"…) or "overlay:<id>", or null.
 export function pickAt(px, py) {
-  for (let i = FRONT_BLOCKS.length - 1; i >= 0; i--) {
-    if (inBox(hitBoxes[FRONT_BLOCKS[i]], px, py)) return FRONT_BLOCKS[i];
+  for (let i = TEXT_BLOCKS.length - 1; i >= 0; i--) {
+    if (inBox(hitBoxes[TEXT_BLOCKS[i]], px, py)) return TEXT_BLOCKS[i];
   }
   for (let i = S.overlays.length - 1; i >= 0; i--) {
     const tok = "overlay:" + S.overlays[i].id;
@@ -81,6 +84,9 @@ export function drawCover(ctx, scale, showGuides, recordHits) {
 
   // ---- BACK COVER VERBIAGE (flows around barcode zone) ----
   drawBackText(ctx, scale);
+  // ---- BACK BLOCKS (tagline / author bio; draggable) ----
+  const back = { x: d.backX * scale, y: 0, w: S.trimW * scale, h: H };
+  for (const kind of BACK_BLOCKS) drawWrapText(ctx, S[kind], back, scale, kind, recordHits);
   // ---- FRONT BLOCKS (title/subtitle/series/pull-quote/author; draggable) ----
   for (const kind of FRONT_BLOCKS) drawWrapText(ctx, S[kind], front, scale, kind, recordHits);
 

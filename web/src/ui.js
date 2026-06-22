@@ -9,7 +9,7 @@ import {
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
   HC_PAGE_MIN, HC_PAGE_MAX,
 } from "./kdp.js";
-import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
+import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox, isBackBlock } from "./render.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
 import { ensureFontsLoaded, loadFonts } from "./fonts.js";
 
@@ -288,6 +288,8 @@ bindSlider("aStrokeW", "aStrokeWL", S.author.stroke, "width", (v) => v + " pt");
 bindTextBlock("sub", "subtitle");
 bindTextBlock("ser", "series");
 bindTextBlock("pq", "pullquote");
+bindTextBlock("tag", "tagline");
+bindTextBlock("bio", "bio");
 
 /* ---------- spine ---------- */
 $("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; rerender(); });
@@ -491,7 +493,7 @@ function dragSelected(e) {
     rerender(); return;
   }
   const o = S[drag.token];
-  const H = d.fullH * scale, x0 = d.frontX * scale, w = S.trimW * scale, tol = 10;
+  const H = d.fullH * scale, x0 = (isBackBlock(drag.token) ? d.backX : d.frontX) * scale, w = S.trimW * scale, tol = 10;
   const topP = (BLEED + SAFE) / d.fullH * 100, botP = (d.fullH - BLEED - SAFE) / d.fullH * 100;
   o.x = clamp(snap((ax - x0) / w, [0.5], tol / w), 0, 1);
   o.y = clamp(snap(ay / H * 100, [topP, 50, botP], tol / H * 100), 0, 100);
@@ -642,6 +644,7 @@ function syncUI() {
   svl("aStrokeW", "aStrokeWL", S.author.stroke.width, (v) => v + " pt");
 
   syncBlock("sub", "subtitle"); syncBlock("ser", "series"); syncBlock("pq", "pullquote");
+  syncBlock("tag", "tagline"); syncBlock("bio", "bio");
 
   sv("sText", S.spine.text); scol("sColor", "sColorL", S.spine.color); schk("sFlip", S.spine.flip);
 

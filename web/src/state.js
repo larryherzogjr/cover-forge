@@ -36,8 +36,11 @@ export const S = {
     text: "Paul's letter to the Romans has shaped the church's confession of grace for two thousand years. In this volume the gospel is set forth in its purest form: God's righteousness revealed apart from the law, received by faith alone, for the ungodly.\n\nWritten for confessional Lutheran laity and for anyone wearied by moralism, these expositions move verse by verse through the whole epistle — justification, the bondage of the will, the comfort of election, and the shape of the Christian life lived from faith.\n\nHere is no self-help and no ladder to climb. Here is Christ, delivered in the ordinary means of grace, for you.",
     font: "EB Garamond", size: 16, y: 7, color: "#e9e3d4", align: "left", lineHeight: 1.34,
   },
+  // Overlay layers (logos / cut-out subjects). Each: { id, src(dataURL),
+  // img(transient), cx, cy (center, inches), w (inches), opacity, blend }.
+  overlays: [],
   guides: true, view: "2d", zoom: 0, // zoom 0 = fit
-  selected: null, // id of the currently-selected draggable block ("title"|"author"|null)
+  selected: null, // selection token: a block id, "overlay:<id>", or null
 };
 
 /* ---------- project save / load (portable JSON) ---------- */
@@ -48,12 +51,13 @@ export const AUTOSAVE_KEY = "cover-forge:autosave";
 // A JSON-serializable snapshot of the whole design. The live Image is stored as
 // its data URL under `image`; everything else is plain data.
 export function serialize() {
-  const { img, ...rest } = S;
+  const { img, overlays, ...rest } = S;
   return {
     app: "cover-forge",
     version: PROJECT_VERSION,
     savedAt: new Date().toISOString(),
-    state: rest,
+    // strip transient live Images; overlays keep their data-URL `src`
+    state: { ...rest, overlays: overlays.map(({ img: _i, ...o }) => o) },
     image: img ? img.src : null,
   };
 }

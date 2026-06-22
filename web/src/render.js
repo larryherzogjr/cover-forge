@@ -21,13 +21,18 @@ export const getPrevScale = () => PREV_SCALE;
 // (preview-scale px) are recorded during the live render so ui.js can hit-test
 // pointer events against them. Add a block here + in state.js to make it real.
 export const FRONT_BLOCKS = ["series", "title", "subtitle", "pullquote", "author"];
-const hitBoxes = {};
-export const getHitBox = (kind) => hitBoxes[kind];
-export function frontHitTest(px, py) {
-  // front-to-back: prefer the topmost (last-drawn) block when boxes overlap.
+const hitBoxes = {};                 // token -> {x,y,w,h} (preview px)
+export const getHitBox = (token) => hitBoxes[token];
+const inBox = (b, px, py) => b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
+// Selection hit-test: front text blocks first (drawn on top), then overlays.
+// Returns a token: a block id ("title"…) or "overlay:<id>", or null.
+export function pickAt(px, py) {
   for (let i = FRONT_BLOCKS.length - 1; i >= 0; i--) {
-    const b = hitBoxes[FRONT_BLOCKS[i]];
-    if (b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return FRONT_BLOCKS[i];
+    if (inBox(hitBoxes[FRONT_BLOCKS[i]], px, py)) return FRONT_BLOCKS[i];
+  }
+  for (let i = S.overlays.length - 1; i >= 0; i--) {
+    const tok = "overlay:" + S.overlays[i].id;
+    if (inBox(hitBoxes[tok], px, py)) return tok;
   }
   return null;
 }
@@ -68,6 +73,9 @@ export function drawCover(ctx, scale, showGuides, recordHits) {
     }
     ctx.restore();
   }
+
+  // ---- OVERLAY LAYERS (logos / cut-out subjects; above art, below text) ----
+  drawOverlays(ctx, scale, recordHits);
 
   const front = { x: d.frontX * scale, y: 0, w: S.trimW * scale, h: H };
 
@@ -188,6 +196,22 @@ function wrapLines(ctx, text, maxW) {
     if (ctx.measureText(t).width > maxW && cur) { out.push(cur); cur = w; } else cur = t;
   }
   if (cur) out.push(cur); return out;
+}
+
+// Overlay layers: each placed by center (cx,cy) in inches with a width w in
+// inches; height follows the image aspect. Resolution-independent.
+function drawOverlays(ctx, scale, recordHits) {
+  for (const ov of S.overlays) {
+    if (!ov.img) continue;
+    const w = ov.w * scale, h = w * (ov.img.height / ov.img.width);
+    const x = ov.cx * scale - w / 2, y = ov.cy * scale - h / 2;
+    ctx.save();
+    ctx.globalAlpha = clamp(ov.opacity != null ? ov.opacity : 1, 0, 1);
+    ctx.globalCompositeOperation = ov.blend || "source-over";
+    ctx.drawImage(ov.img, x, y, w, h);
+    ctx.restore();
+    if (recordHits) hitBoxes["overlay:" + ov.id] = { x, y, w, h };
+  }
 }
 
 export function drawImageFit(ctx, img, rx, ry, rw, rh, zoom, panXpx, panYpx) {

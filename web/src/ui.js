@@ -8,7 +8,7 @@ import {
   dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
 } from "./kdp.js";
-import { render, drawCover, getPrevScale, rotateBy, frontHitTest, getHitBox } from "./render.js";
+import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
 import { exportWrap, exportEbook, exportPDF } from "./export.js";
 import { ensureFontsLoaded } from "./fonts.js";
 
@@ -287,6 +287,55 @@ function loadImg(f) {
   r.readAsDataURL(f);
 }
 
+/* ---------- overlay layers ---------- */
+const loadImageAsync = (src) => new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+const newOverlayId = () => "ov_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1e4).toString(36);
+const selectedOverlay = () => (S.selected && S.selected.startsWith("overlay:")) ? overlayById(S.selected.slice(8)) : null;
+
+async function addOverlayFromFile(f) {
+  if (!f) return;
+  const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(f); });
+  if (!src) return;
+  const img = await loadImageAsync(src);
+  if (!img) { setProjStatus("bad", "Could not read that image."); return; }
+  const d = dims(S);
+  S.overlays.push({ id: newOverlayId(), src, img, w: S.trimW * 0.4, cx: d.frontX + S.trimW / 2, cy: d.fullH * 0.5, opacity: 1, blend: "source-over" });
+  S.selected = "overlay:" + S.overlays[S.overlays.length - 1].id;
+  updateOverlayPanel(); rerender();
+}
+
+function updateOverlayPanel() {
+  const list = $("ovList"); list.innerHTML = "";
+  S.overlays.forEach((ov, i) => {
+    const row = document.createElement("div");
+    row.className = "ovrow" + (S.selected === "overlay:" + ov.id ? " sel" : "");
+    const im = document.createElement("img"); im.src = ov.src;
+    const lab = document.createElement("span"); lab.textContent = "Layer " + (i + 1);
+    row.append(im, lab);
+    row.onclick = () => { S.selected = "overlay:" + ov.id; updateOverlayPanel(); rerender(); };
+    list.appendChild(row);
+  });
+  const ov = selectedOverlay();
+  $("ovControls").style.display = ov ? "block" : "none";
+  $("ovEmpty").style.display = S.overlays.length ? "none" : "block";
+  if (ov) {
+    const wp = Math.round(ov.w / S.trimW * 100), op = Math.round((ov.opacity ?? 1) * 100);
+    $("ovW").value = wp; $("ovWL").textContent = wp + "%";
+    $("ovOp").value = op; $("ovOpL").textContent = op + "%";
+    $("ovBlend").value = ov.blend || "source-over";
+  }
+}
+
+$("ovDrop").onclick = () => $("ovFile").click();
+$("ovFile").onchange = (e) => { const f = e.target.files[0]; if (f) addOverlayFromFile(f); e.target.value = ""; };
+["dragover", "dragenter"].forEach((ev) => $("ovDrop").addEventListener(ev, (e) => { e.preventDefault(); $("ovDrop").style.borderColor = "var(--brass)"; }));
+["dragleave", "drop"].forEach((ev) => $("ovDrop").addEventListener(ev, (e) => { e.preventDefault(); $("ovDrop").style.borderColor = ""; }));
+$("ovDrop").addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) addOverlayFromFile(e.dataTransfer.files[0]); });
+$("ovW").addEventListener("input", (e) => { const ov = selectedOverlay(); if (ov) { ov.w = +e.target.value / 100 * S.trimW; $("ovWL").textContent = e.target.value + "%"; rerender(); } });
+$("ovOp").addEventListener("input", (e) => { const ov = selectedOverlay(); if (ov) { ov.opacity = +e.target.value / 100; $("ovOpL").textContent = e.target.value + "%"; rerender(); } });
+$("ovBlend").addEventListener("change", (e) => { const ov = selectedOverlay(); if (ov) { ov.blend = e.target.value; rerender(); } });
+$("ovDel").onclick = () => { const ov = selectedOverlay(); if (!ov) return; S.overlays = S.overlays.filter((o) => o !== ov); S.selected = null; updateOverlayPanel(); rerender(); };
+
 /* ---------- export ---------- */
 $("expWrap").onclick = exportWrap;
 $("expEbook").onclick = exportEbook;
@@ -312,49 +361,59 @@ $("expPdf").onclick = async () => {
 $("scale").addEventListener("input", (e) => { S.imgScale = +e.target.value / 100; $("scaleL").textContent = e.target.value + "%"; rerender(); });
 $("imgReset").onclick = () => { S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%"; rerender(); };
 
-// Canvas interactions: dragging a selected front block takes priority; empty
-// space pans the background image. Block positions snap to the safe-area guides.
+// Canvas interactions: dragging the selected element (front block or overlay)
+// takes priority; empty space pans the background image. Blocks snap to guides.
 let imgDrag = false, ix, iy;
-let blockDrag = null; // { kind, offX, offY } in canvas px
+let drag = null; // { token, offX, offY } in canvas px
 
 const canvasPt = (e) => {
   const r = cv.getBoundingClientRect();
   return { x: (e.clientX - r.left) * (cv.width / r.width), y: (e.clientY - r.top) * (cv.height / r.height) };
 };
 const capture = (id) => { try { cv.setPointerCapture(id); } catch (_) { /* inactive pointer */ } };
+const overlayById = (id) => S.overlays.find((o) => o.id === id);
 
-function dragBlock(e) {
-  const p = canvasPt(e), o = S[blockDrag.kind], d = dims(S), scale = getPrevScale();
-  const H = d.fullH * scale, x0 = d.frontX * scale, w = S.trimW * scale;
-  const ax = p.x + blockDrag.offX, ay = p.y + blockDrag.offY; // block center
-  const tol = 10; // px snap radius
+function dragSelected(e) {
+  const p = canvasPt(e), d = dims(S), scale = getPrevScale();
+  const ax = p.x + drag.offX, ay = p.y + drag.offY; // element center
+  if (drag.token.startsWith("overlay:")) {
+    const ov = overlayById(drag.token.slice(8)); if (!ov) return;
+    ov.cx = clamp(ax / scale, 0, d.fullW);
+    ov.cy = clamp(ay / scale, 0, d.fullH);
+    rerender(); return;
+  }
+  const o = S[drag.token];
+  const H = d.fullH * scale, x0 = d.frontX * scale, w = S.trimW * scale, tol = 10;
   const topP = (BLEED + SAFE) / d.fullH * 100, botP = (d.fullH - BLEED - SAFE) / d.fullH * 100;
   o.x = clamp(snap((ax - x0) / w, [0.5], tol / w), 0, 1);
   o.y = clamp(snap(ay / H * 100, [topP, 50, botP], tol / H * 100), 0, 100);
-  const yEl = blockDrag.kind === "title" ? "tY" : "aY", yLab = blockDrag.kind === "title" ? "tYL" : "aYL";
-  $(yEl).value = clamp(Math.round(o.y), +$(yEl).min, +$(yEl).max);
-  $(yLab).textContent = Math.round(o.y) + "%";
+  if (drag.token === "title" || drag.token === "author") {
+    const yEl = drag.token === "title" ? "tY" : "aY", yLab = drag.token === "title" ? "tYL" : "aYL";
+    $(yEl).value = clamp(Math.round(o.y), +$(yEl).min, +$(yEl).max);
+    $(yLab).textContent = Math.round(o.y) + "%";
+  }
   rerender();
 }
 
 cv.addEventListener("pointerdown", (e) => {
   const p = canvasPt(e);
   if (S.view === "2d") {
-    const kind = frontHitTest(p.x, p.y);
-    if (kind) {
-      const hb = getHitBox(kind);
-      blockDrag = { kind, offX: (hb.x + hb.w / 2) - p.x, offY: (hb.y + hb.h / 2) - p.y };
-      S.selected = kind; capture(e.pointerId); cv.style.cursor = "grabbing"; rerender(); return;
+    const token = pickAt(p.x, p.y);
+    if (token) {
+      const hb = getHitBox(token);
+      drag = { token, offX: (hb.x + hb.w / 2) - p.x, offY: (hb.y + hb.h / 2) - p.y };
+      S.selected = token; capture(e.pointerId); cv.style.cursor = "grabbing";
+      updateOverlayPanel(); rerender(); return;
     }
   }
-  if (S.selected) { S.selected = null; rerender(); }
+  if (S.selected) { S.selected = null; updateOverlayPanel(); rerender(); }
   if (!S.img) return;
   imgDrag = true; ix = e.clientX; iy = e.clientY; capture(e.pointerId); cv.style.cursor = "grabbing";
 });
 cv.addEventListener("pointermove", (e) => {
-  if (blockDrag) { dragBlock(e); return; }
+  if (drag) { dragSelected(e); return; }
   if (!imgDrag) {
-    cv.style.cursor = (S.view === "2d" && frontHitTest(canvasPt(e).x, canvasPt(e).y)) ? "move" : (S.img ? "grab" : "default");
+    cv.style.cursor = (S.view === "2d" && pickAt(canvasPt(e).x, canvasPt(e).y)) ? "move" : (S.img ? "grab" : "default");
     return;
   }
   const r = cv.getBoundingClientRect();
@@ -362,7 +421,7 @@ cv.addEventListener("pointermove", (e) => {
   S.imgY += (e.clientY - iy) * (cv.height / r.height) / getPrevScale();
   ix = e.clientX; iy = e.clientY; rerender();
 });
-cv.addEventListener("pointerup", () => { blockDrag = null; imgDrag = false; cv.style.cursor = S.img ? "grab" : "default"; });
+cv.addEventListener("pointerup", () => { drag = null; imgDrag = false; cv.style.cursor = S.img ? "grab" : "default"; });
 cv.addEventListener("wheel", (e) => {
   if (!S.img) return; e.preventDefault();
   const r = cv.getBoundingClientRect();
@@ -461,6 +520,7 @@ function syncUI() {
   sseg("#bAlignSeg", "align", S.back.align);
   scol("bColor", "bColorL", S.back.color);
 
+  updateOverlayPanel();
   schk("guides", S.guides);
   sseg("#viewSeg", "view", S.view);
   $("view2d").style.display = S.view === "2d" ? "block" : "none";
@@ -493,6 +553,8 @@ async function applyProject(parsed) {
   } else {
     $("thumb").classList.remove("show"); S.palette = []; renderSwatches(); cv.style.cursor = "default";
   }
+  // reconstruct overlay images from their saved data URLs
+  for (const ov of S.overlays) { if (ov.src && !ov.img) ov.img = await loadImageAsync(ov.src); }
   syncUI();
 }
 function loadProjectFile(f) {

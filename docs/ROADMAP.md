@@ -25,7 +25,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 - [x] Text controls: stroke/outline, letter-spacing, line-height, all-caps toggle, shadow tuning (offset/blur/opacity). Title gets the full set; author gets caps/letter-spacing/outline; back gets line-height.
 - [x] **Solid + gradient** background mode (no image required). Two-stop linear gradient at an adjustable angle (`kdp.gradientLine`).
 - [x] Image **blend modes** (normal/multiply/screen/overlay/darken/lighten) via `globalCompositeOperation`. (RGB color grading still TODO.)
-- [ ] **Overlay/logo layers**: place additional PNGs (e.g. a publisher mark or a background-removed subject) with their own move/scale.
+- [x] **Overlay/logo layers**: add PNGs (logo / publisher mark / cut-out subject) as layers with their own position (drag), width, opacity, and blend; multi-layer list with select + delete; saved/loaded with the project (`src` embedded). Drawn above the art, below the text. This is also the drop target for M3 background removal.
 
 ## M3 — Workflow & server features (Tier 3)
 

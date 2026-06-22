@@ -152,6 +152,13 @@
   .thumb.show{display:block}
   .thumb img{display:block;width:100%;height:84px;object-fit:cover}
 
+  .ovrow{display:flex;align-items:center;gap:9px;padding:5px 7px;border:1px solid var(--line);
+    border-radius:7px;margin-top:6px;cursor:pointer;transition:border-color .12s,background .12s}
+  .ovrow:hover{border-color:var(--line-strong)}
+  .ovrow.sel{border-color:var(--brass);background:rgba(198,167,94,.08)}
+  .ovrow img{width:30px;height:30px;object-fit:contain;background:var(--ink-2);border-radius:4px;flex:none}
+  .ovrow span{font-size:12px;color:var(--text)}
+
   .mini{font-size:10.5px;color:var(--muted);line-height:1.5}
   footer{padding:11px 22px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);
     display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -327,6 +334,27 @@
       <div id="palette" style="margin-top:14px;display:none">
         <span class="mini">Extracted palette — click to use as text color</span>
         <div class="swatches" id="swatches"></div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Overlays / logo</p>
+      <div class="filedrop" id="ovDrop">
+        <strong>Add overlay image</strong><br>logo, badge, or cut-out subject
+        <input type="file" id="ovFile" accept="image/*" hidden>
+      </div>
+      <div id="ovList"></div>
+      <p class="mini" id="ovEmpty" style="margin-top:8px">No overlays yet. Add a transparent PNG (a logo, or a background-removed subject), then drag it on the preview to place it.</p>
+      <div id="ovControls" style="display:none">
+        <label class="fld" style="margin-top:10px"><span>Width <b id="ovWL" class="mono">40%</b></span><input type="range" id="ovW" min="5" max="150" value="40"></label>
+        <label class="fld"><span>Opacity <b id="ovOpL" class="mono">100%</b></span><input type="range" id="ovOp" min="0" max="100" value="100"></label>
+        <label class="fld"><span>Blend mode</span>
+          <select id="ovBlend">
+            <option value="source-over">Normal</option><option value="multiply">Multiply</option><option value="screen">Screen</option><option value="overlay">Overlay</option><option value="darken">Darken</option><option value="lighten">Lighten</option>
+          </select>
+        </label>
+        <button class="btn ghost" id="ovDel" style="padding:8px;font-size:12px;margin-bottom:0">Remove selected overlay</button>
+        <p class="mini" style="margin-top:8px">Drag the overlay on the preview to position it.</p>
       </div>
     </div>
 

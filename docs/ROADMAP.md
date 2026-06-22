@@ -33,7 +33,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 - [x] **Background removal**: `/api/remove-bg` implemented (lazy rembg + cached session, `CF_REMBG_MODEL`; 503 if rembg absent). The "Remove background → overlay" action posts the uploaded image and drops the returned cut-out in as an overlay layer; degrades gracefully when the API/model isn't available. The real model runs on the GPU box (rembg stays commented in requirements).
 - [ ] **Hardcover mode**: implement case-laminate spine/hinge/wrap math from `docs/KDP_SPEC.md` — verify every number against KDP's calculator first; add a binding toggle.
 - [x] **Font-load hardening**: `loadFonts()` (fonts.js) awaits `document.fonts.load(...)` at 400/600/700 for every family the design uses; all three exports (PNG wrap, ebook, PDF) await it before rasterizing, and picking a font loads its face then re-renders the preview.
-- [ ] **Undo/redo** (command stack over `S`).
+- [x] **Undo/redo**: debounced snapshot stack over `S` (reuses `serialize`/`restore`), capped at 50, with Undo/Redo buttons + Cmd/Ctrl+Z and Shift/⌥Y. A session image cache makes restores synchronous (covers overlay/image add+remove); data-URL strings are interned so history doesn't balloon.
 
 ## M4 — Nice-to-have
 

@@ -21,6 +21,7 @@ function rerender() {
   render();
   updateNotices();
   autosave();
+  scheduleCommit();
 }
 // Re-render now (fallback type), then again once the newly-picked face loads.
 const loadFontThenRender = (fam) => { loadFonts([fam]).then(rerender); };
@@ -39,6 +40,64 @@ function autosave() {
       try { const j = serialize(); j.image = null; localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(j)); } catch (__) { /* give up */ }
     }
   }, 600);
+}
+
+/* ---------- undo / redo (debounced snapshot stack over S) ---------- */
+const HISTORY_CAP = 50;
+const imgCache = new Map();                 // src -> HTMLImageElement (sync restore)
+const cacheImg = (img) => { if (img && img.src) imgCache.set(img.src, img); return img; };
+async function cacheLoad(src) {
+  if (imgCache.has(src)) return imgCache.get(src);
+  const im = await loadImageAsync(src); if (im) imgCache.set(src, im); return im;
+}
+// Intern data-URL strings so identical images across snapshots share one copy.
+const srcPool = new Map();
+const intern = (s) => { if (s == null) return s; if (!srcPool.has(s)) srcPool.set(s, s); return srcPool.get(s); };
+function snapshot() {
+  const snap = JSON.parse(JSON.stringify(serialize()));
+  snap.image = intern(snap.image);
+  for (const o of snap.state.overlays || []) o.src = intern(o.src);
+  return snap;
+}
+// Cheap change-signature: design state + image identity, excluding binary bulk.
+function signature(snap) {
+  const st = snap.state;
+  const lite = { ...st, overlays: (st.overlays || []).map((o) => ({ ...o, src: o.src ? o.src.length : null })) };
+  return JSON.stringify({ s: lite, i: snap.image ? snap.image.length : 0 });
+}
+const hist = { past: [], future: [], current: null, curSig: "" };
+function commitHistory() {
+  const snap = snapshot(), sig = signature(snap);
+  if (sig === hist.curSig) return;            // nothing meaningful changed
+  if (hist.current) { hist.past.push(hist.current); if (hist.past.length > HISTORY_CAP) hist.past.shift(); }
+  hist.current = snap; hist.curSig = sig; hist.future = [];
+  updateUndoButtons();
+}
+let _commitTimer = null;
+function scheduleCommit() { if (!booted) return; clearTimeout(_commitTimer); _commitTimer = setTimeout(commitHistory, 500); }
+function initHistory() { hist.current = snapshot(); hist.curSig = signature(hist.current); hist.past = []; hist.future = []; updateUndoButtons(); }
+function updateUndoButtons() { $("undoBtn").disabled = !hist.past.length; $("redoBtn").disabled = !hist.future.length; }
+
+async function applySnapshot(snap) {
+  const cloned = JSON.parse(JSON.stringify(snap));
+  const imgUrl = restore(cloned);             // deep-merges state into S, returns bg image URL
+  S.img = imgUrl ? await cacheLoad(imgUrl) : null;
+  if (S.img) { $("thumb").classList.add("show"); $("thumbImg").src = S.img.src; cv.style.cursor = "grab"; }
+  else { $("thumb").classList.remove("show"); cv.style.cursor = "default"; }
+  for (const ov of S.overlays) { if (ov.src) ov.img = await cacheLoad(ov.src); }
+  syncUI();
+}
+async function undo() {
+  if (!hist.past.length) return;
+  hist.future.push(hist.current);
+  hist.current = hist.past.pop(); hist.curSig = signature(hist.current);
+  await applySnapshot(hist.current); updateUndoButtons();
+}
+async function redo() {
+  if (!hist.future.length) return;
+  hist.past.push(hist.current);
+  hist.current = hist.future.pop(); hist.curSig = signature(hist.current);
+  await applySnapshot(hist.current); updateUndoButtons();
 }
 
 /* ---------- pre-flight notices (effective DPI + CMYK gamut) ---------- */
@@ -279,7 +338,7 @@ function loadImg(f) {
   r.onload = () => {
     const img = new Image();
     img.onload = () => {
-      S.img = img; $("thumb").classList.add("show"); $("thumbImg").src = img.src;
+      S.img = cacheImg(img); $("thumb").classList.add("show"); $("thumbImg").src = img.src;
       S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%";
       cv.style.cursor = "grab";
       extractPalette(img); rerender();
@@ -297,6 +356,7 @@ const selectedOverlay = () => (S.selected && S.selected.startsWith("overlay:")) 
 async function addOverlayFromSrc(src, widthFrac) {
   const img = await loadImageAsync(src);
   if (!img) return null;
+  cacheImg(img);
   const d = dims(S);
   const ov = { id: newOverlayId(), src, img, w: S.trimW * (widthFrac || 0.4), cx: d.frontX + S.trimW / 2, cy: d.fullH * 0.5, opacity: 1, blend: "source-over" };
   S.overlays.push(ov);
@@ -571,13 +631,13 @@ function projectFileName() {
 async function applyProject(parsed) {
   const dataUrl = restore(parsed);
   if (dataUrl) {
-    await new Promise((res) => { const im = new Image(); im.onload = () => { S.img = im; res(); }; im.onerror = res; im.src = dataUrl; });
+    S.img = await cacheLoad(dataUrl);
     if (S.img) { $("thumb").classList.add("show"); $("thumbImg").src = dataUrl; cv.style.cursor = "grab"; extractPalette(S.img); }
   } else {
     $("thumb").classList.remove("show"); S.palette = []; renderSwatches(); cv.style.cursor = "default";
   }
-  // reconstruct overlay images from their saved data URLs
-  for (const ov of S.overlays) { if (ov.src && !ov.img) ov.img = await loadImageAsync(ov.src); }
+  // reconstruct overlay images from their saved data URLs (cached for undo/redo)
+  for (const ov of S.overlays) { if (ov.src && !ov.img) ov.img = await cacheLoad(ov.src); }
   syncUI();
 }
 function loadProjectFile(f) {
@@ -593,13 +653,24 @@ $("saveProj").onclick = () => { downloadJSON(serialize(), projectFileName()); se
 $("loadProj").onclick = () => $("projFile").click();
 $("projFile").onchange = (e) => { const f = e.target.files[0]; if (f) loadProjectFile(f); e.target.value = ""; };
 
+$("undoBtn").onclick = undo;
+$("redoBtn").onclick = redo;
+window.addEventListener("keydown", (e) => {
+  const tag = e.target && e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return; // leave native field undo alone
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if ((e.key === "z" && e.shiftKey) || e.key === "y") { e.preventDefault(); redo(); }
+});
+
 /* ---------- boot ---------- */
 async function boot() {
   try {
     const raw = localStorage.getItem(AUTOSAVE_KEY);
     if (raw) await applyProject(JSON.parse(raw)); // restores last session
   } catch (_) { /* ignore a corrupt autosave */ }
-  booted = true; // autosave enabled only after restore settles (no clobber)
+  booted = true; // autosave + history enabled only after restore settles
+  initHistory();
   updateReadout();
   ensureFontsLoaded().then(rerender);
   setTimeout(rerender, 300);

@@ -1,0 +1,13 @@
+# Core
+Flask>=3.0
+flask-cors>=4.0
+gunicorn>=21.2
+
+# Image / PDF (Tier 1 export)
+Pillow>=10.0
+img2pdf>=0.5
+
+# Background removal (Tier 3) — heavy; install on the GPU box.
+# rembg pulls onnxruntime. Use onnxruntime-gpu on the inference server.
+# rembg>=2.0
+# onnxruntime>=1.17        # or: onnxruntime-gpu

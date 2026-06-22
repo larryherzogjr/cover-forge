@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cover Forge — KDP full-wrap cover tool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;700;900&family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:wght@400;600&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400;600;700&family=Bebas+Neue&family=Montserrat:wght@500;700;900&family=Archivo+Black&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0e1a2b; --ink-2:#15273e; --ink-3:#1d3251; --raised:#22395a;
+    --line:rgba(198,167,94,.18); --line-strong:rgba(198,167,94,.34);
+    --brass:#c6a75e; --brass-bright:#e3c982; --paper:#f4efe3;
+    --text:#e9eef6; --muted:#8ea2bd; --danger:#d98a6f; --ok:#86b29a;
+    --shadow:0 18px 50px rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    font-family:Inter,system-ui,sans-serif;color:var(--text);
+    background:
+      radial-gradient(1100px 600px at 80% -10%, rgba(198,167,94,.07), transparent 60%),
+      linear-gradient(180deg,#0c1626,#0e1a2b 40%,#0b1422);
+    display:flex;flex-direction:column;min-height:100%;
+  }
+  h1,h2,h3,.disp{font-family:"Space Grotesk",sans-serif}
+  .mono{font-family:"Space Mono",monospace}
+
+  header{
+    display:flex;align-items:center;gap:14px;padding:14px 22px;
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30;
+    background:linear-gradient(180deg,rgba(14,26,43,.96),rgba(14,26,43,.86));
+    backdrop-filter:blur(8px);
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .mark{
+    width:34px;height:46px;border-radius:3px 5px 5px 3px;position:relative;flex:none;
+    background:linear-gradient(135deg,var(--ink-3),var(--raised));
+    border:1px solid var(--line-strong);box-shadow:inset 7px 0 0 -4px var(--brass);
+  }
+  .mark::after{content:"";position:absolute;inset:7px 6px;border:1px solid var(--line);border-radius:2px}
+  header h1{font-size:18px;margin:0;letter-spacing:.3px;font-weight:600}
+  header .tag{font-size:11.5px;color:var(--muted);letter-spacing:.4px;margin-top:1px}
+  header .spacer{flex:1}
+  .pill{
+    font-size:11px;color:var(--muted);border:1px solid var(--line);
+    padding:5px 11px;border-radius:999px;letter-spacing:.3px
+  }
+
+  .layout{display:grid;grid-template-columns:330px 1fr 312px;gap:0;flex:1;min-height:0}
+  @media(max-width:1180px){.layout{grid-template-columns:1fr}}
+
+  .panel{padding:18px 18px 30px;overflow-y:auto;min-height:0}
+  .panel.left{border-right:1px solid var(--line)}
+  .panel.right{border-left:1px solid var(--line)}
+  .stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    padding:22px 18px 30px;overflow:auto;background:
+      repeating-linear-gradient(45deg,rgba(255,255,255,.012) 0 12px,transparent 12px 24px);}
+
+  .grp{margin-bottom:22px}
+  .grp > .eyebrow{
+    font-family:"Space Mono",monospace;font-size:10.5px;letter-spacing:2px;
+    text-transform:uppercase;color:var(--brass);margin:0 0 12px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .grp > .eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  label.fld{display:block;margin-bottom:13px}
+  label.fld > span{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;letter-spacing:.2px}
+  input[type=text],input[type=number],select,textarea{
+    width:100%;background:var(--ink-2);border:1px solid var(--line);color:var(--text);
+    padding:8px 10px;border-radius:7px;font-size:13px;font-family:inherit;outline:none;
+  }
+  input:focus,select:focus,textarea:focus{border-color:var(--brass);box-shadow:0 0 0 3px rgba(198,167,94,.12)}
+  select{appearance:none;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 16px) 16px,calc(100% - 11px) 16px;background-size:5px 5px;background-repeat:no-repeat}
+  .row{display:flex;gap:9px}
+  .row > *{flex:1}
+
+  .seg{display:flex;background:var(--ink-2);border:1px solid var(--line);border-radius:8px;padding:3px;gap:3px}
+  .seg button{flex:1;background:transparent;border:0;color:var(--muted);font-size:12px;
+    padding:7px 4px;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:.2px}
+  .seg button.on{background:var(--raised);color:var(--text);box-shadow:inset 0 0 0 1px var(--line-strong)}
+
+  input[type=range]{width:100%;accent-color:var(--brass);margin:2px 0}
+  input[type=color]{width:38px;height:30px;padding:2px;border-radius:6px;background:var(--ink-2);border:1px solid var(--line);cursor:pointer}
+  .colorrow{display:flex;align-items:center;gap:9px}
+  .colorrow .mono{font-size:11px;color:var(--muted)}
+
+  .readout{background:var(--ink-2);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+  .readout .line{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12.5px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .readout .line:last-child{border-bottom:0}
+  .readout .k{color:var(--muted);letter-spacing:.2px}
+  .readout .v{font-family:"Space Mono",monospace;color:var(--text);font-size:12px}
+  .readout .v small{color:var(--muted);font-weight:400}
+  .readout .hero{padding-bottom:9px;margin-bottom:3px;border-bottom:1px solid var(--line)}
+  .readout .hero .v{font-size:17px;color:var(--brass-bright)}
+
+  .note{font-size:11.5px;line-height:1.5;color:var(--muted);margin-top:9px}
+  .warn{display:none;font-size:11.5px;line-height:1.45;color:var(--danger);
+    background:rgba(217,138,111,.08);border:1px solid rgba(217,138,111,.3);
+    border-radius:8px;padding:9px 11px;margin-top:10px}
+  .warn.show{display:block}
+
+  .swatches{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+  .sw{width:30px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.18);cursor:pointer;position:relative;transition:transform .12s}
+  .sw:hover{transform:translateY(-2px)}
+  .sw small{position:absolute;inset:auto 0 -16px;font-size:8px;text-align:center;color:var(--muted);font-family:"Space Mono",monospace}
+
+  .stagebar{display:flex;align-items:center;gap:9px;margin-bottom:14px;flex-wrap:wrap;justify-content:center}
+  .gtog{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);
+    border:1px solid var(--line);border-radius:7px;padding:6px 10px;cursor:pointer;user-select:none}
+  .gtog input{accent-color:var(--brass)}
+  .gtog.zoom{padding:5px 6px}
+  .gtog.zoom button{background:transparent;border:0;color:var(--text);cursor:pointer;font-size:14px;width:20px;line-height:1}
+
+  .canvaswrap{position:relative;box-shadow:var(--shadow);background:var(--paper);border-radius:2px}
+  canvas#preview{display:block;border-radius:2px}
+
+  .scene{perspective:1700px;width:100%;display:flex;justify-content:center;padding:24px 0 8px;min-height:360px;align-items:center}
+  .book{position:relative;transform-style:preserve-3d;cursor:grab;transition:transform .05s linear}
+  .book:active{cursor:grabbing}
+  .book .face{position:absolute;top:0;left:0;overflow:hidden;backface-visibility:hidden;background:#222}
+  .book .face img{display:block;width:100%;height:100%;object-fit:fill}
+  .book .pages{position:absolute;top:2px;bottom:2px;background:
+    repeating-linear-gradient(90deg,#f4efe3 0 1px,#e6dcc7 1px 2px);}
+  .hint3d{font-size:11px;color:var(--muted);text-align:center;margin-top:4px}
+
+  .btn{width:100%;border:0;border-radius:9px;padding:12px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:inherit;letter-spacing:.2px;margin-bottom:10px;transition:filter .15s}
+  .btn.primary{background:linear-gradient(180deg,var(--brass-bright),var(--brass));color:#241c08}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.ghost{background:var(--ink-2);color:var(--text);border:1px solid var(--line)}
+  .btn.ghost:hover{border-color:var(--brass)}
+
+  .filedrop{border:1.5px dashed var(--line-strong);border-radius:10px;padding:16px;text-align:center;
+    cursor:pointer;font-size:12px;color:var(--muted);transition:border-color .15s,background .15s}
+  .filedrop:hover{border-color:var(--brass);background:rgba(198,167,94,.04)}
+  .filedrop strong{color:var(--text);font-weight:600}
+  .thumb{margin-top:10px;border-radius:8px;overflow:hidden;border:1px solid var(--line);display:none}
+  .thumb.show{display:block}
+  .thumb img{display:block;width:100%;height:84px;object-fit:cover}
+
+  .mini{font-size:10.5px;color:var(--muted);line-height:1.5}
+  footer{padding:11px 22px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);
+    display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  footer b{color:var(--brass)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:var(--ink-3);border-radius:8px;border:2px solid var(--ink)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark"></div>
+    <div>
+      <h1>Cover&nbsp;Forge</h1>
+      <div class="tag">KDP full-wrap cover tool · prototype</div>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="pill">300&nbsp;DPI · paperback wrap</div>
+</header>
+
+<div class="layout">
+
+  <!-- ============ LEFT: SPEC ============ -->
+  <div class="panel left">
+    <div class="grp">
+      <p class="eyebrow">Book spec</p>
+
+      <label class="fld">
+        <span>Trim size</span>
+        <select id="trim">
+          <option value="5,8">5 × 8 in</option>
+          <option value="5.25,8">5.25 × 8 in</option>
+          <option value="5.5,8.5">5.5 × 8.5 in</option>
+          <option value="6,9" selected>6 × 9 in (trade)</option>
+          <option value="6.14,9.21">6.14 × 9.21 in</option>
+          <option value="7,10">7 × 10 in</option>
+          <option value="8,10">8 × 10 in</option>
+          <option value="8.5,11">8.5 × 11 in</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </label>
+
+      <div class="row" id="customWrap" style="display:none">
+        <label class="fld"><span>Width in</span><input type="number" id="cw" value="6" step="0.01" min="3"></label>
+        <label class="fld"><span>Height in</span><input type="number" id="ch" value="9" step="0.01" min="3"></label>
+      </div>
+
+      <div class="row">
+        <label class="fld"><span>Page count</span><input type="number" id="pages" value="220" min="24" max="828" step="2"></label>
+        <label class="fld">
+          <span>Paper</span>
+          <select id="paper">
+            <option value="0.002252" selected>White</option>
+            <option value="0.0025">Cream</option>
+            <option value="0.002347">Color (std)</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Computed wrap</p>
+      <div class="readout">
+        <div class="line hero"><span class="k">Spine width</span><span class="v" id="oSpine">—</span></div>
+        <div class="line"><span class="k">Full cover</span><span class="v" id="oFull">—</span></div>
+        <div class="line"><span class="k">Pixels @300</span><span class="v" id="oPx">—</span></div>
+        <div class="line"><span class="k">Bleed (each edge)</span><span class="v">0.125 <small>in</small></span></div>
+        <div class="line"><span class="k">Safe margin</span><span class="v">0.25 <small>in</small></span></div>
+        <div class="line"><span class="k">Spine text</span><span class="v" id="oSpineText">—</span></div>
+      </div>
+      <div class="warn" id="spineWarn"></div>
+      <p class="note">Wrap&nbsp;= 0.125 + back + spine + front + 0.125&nbsp;wide, trim&nbsp;+&nbsp;0.25 tall. Always reconcile the final number against KDP's own cover calculator before upload — printers fold the ~0.06″ binding allowance in differently, so order a proof.</p>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Guided start</p>
+      <label class="fld">
+        <span>Genre (suggests fonts + palette)</span>
+        <select id="genre">
+          <option value="none">— none —</option>
+          <option value="theology">Theology / religious</option>
+          <option value="literary">Literary fiction</option>
+          <option value="thriller">Thriller / suspense</option>
+          <option value="romance">Romance</option>
+          <option value="scifi">Sci-fi / fantasy</option>
+          <option value="nonfic">Non-fiction / business</option>
+          <option value="academic">Academic / reference</option>
+        </select>
+      </label>
+      <button class="btn ghost" id="applyGenre">Apply suggestions</button>
+    </div>
+  </div>
+
+  <!-- ============ CENTER: STAGE ============ -->
+  <div class="panel stage">
+    <div class="stagebar">
+      <div class="seg" id="viewSeg" style="width:170px">
+        <button class="on" data-view="2d">2D wrap</button>
+        <button data-view="3d">3D book</button>
+      </div>
+      <label class="gtog" id="guideTog"><input type="checkbox" id="guides" checked> Guides</label>
+      <div class="gtog zoom"><button id="zout">−</button><span class="mono" id="zlabel" style="font-size:11px;width:40px;text-align:center">fit</span><button id="zin">+</button></div>
+    </div>
+
+    <div id="view2d">
+      <div class="canvaswrap"><canvas id="preview"></canvas></div>
+    </div>
+
+    <div id="view3d" style="display:none;width:100%">
+      <div class="scene"><div class="book" id="book"></div></div>
+      <p class="hint3d">drag to rotate · scroll the page if it clips</p>
+    </div>
+  </div>
+
+  <!-- ============ RIGHT: DESIGN ============ -->
+  <div class="panel right">
+    <div class="grp">
+      <p class="eyebrow">Artwork</p>
+      <div class="filedrop" id="drop">
+        <strong>Drop / choose image</strong><br>background art for the wrap
+        <input type="file" id="file" accept="image/*" hidden>
+      </div>
+      <div class="thumb" id="thumb"><img id="thumbImg"></div>
+      <div class="seg" id="fitSeg" style="margin-top:10px">
+        <button class="on" data-fit="wrap">Cover wrap</button>
+        <button data-fit="front">Front only</button>
+      </div>
+      <label class="fld" style="margin-top:12px"><span>Image opacity <b id="opL" class="mono"></b></span><input type="range" id="opacity" min="0" max="100" value="100"></label>
+      <div class="colorrow"><input type="color" id="bgColor" value="#141414"><span class="mono" id="bgColorL">#141414</span><span class="mini" style="margin-left:auto">base behind image</span></div>
+      <label class="fld" style="margin-top:12px"><span>Image size <b id="scaleL" class="mono">100%</b></span><input type="range" id="scale" min="20" max="800" value="100"></label>
+      <button class="btn ghost" id="imgReset" style="padding:8px;font-size:12px;margin-bottom:0">Reset image position</button>
+      <p class="mini" style="margin-top:8px">Drag the preview to move the art · scroll over it to zoom at the cursor.</p>
+      <div id="palette" style="margin-top:14px;display:none">
+        <span class="mini">Extracted palette — click to use as text color</span>
+        <div class="swatches" id="swatches"></div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Title</p>
+      <label class="fld"><textarea id="tTitle" rows="2" placeholder="Your Title">The Purest Gospel</textarea></label>
+      <label class="fld">
+        <select id="tFont" data-target="title">
+          <optgroup label="Serif"><option>Playfair Display</option><option>Cormorant Garamond</option><option>EB Garamond</option><option>Libre Baskerville</option></optgroup>
+          <optgroup label="Sans / display"><option>Oswald</option><option>Bebas Neue</option><option>Montserrat</option><option>Archivo Black</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="tSizeL" class="mono"></b></span><input type="range" id="tSize" min="24" max="150" value="74"></label>
+      <label class="fld"><span>Vertical <b id="tYL" class="mono"></b></span><input type="range" id="tY" min="6" max="92" value="20"></label>
+      <div class="colorrow"><input type="color" id="tColor" value="#f4efe3"><span class="mono" id="tColorL">#f4efe3</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tShadow" checked> shadow</label></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Author</p>
+      <label class="fld"><input type="text" id="aText" value="Larry Herzog Jr."></label>
+      <label class="fld">
+        <select id="aFont" data-target="author">
+          <option>Montserrat</option><option>Oswald</option><option selected>Cormorant Garamond</option><option>EB Garamond</option><option>Bebas Neue</option>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="aSizeL" class="mono"></b></span><input type="range" id="aSize" min="14" max="64" value="30"></label>
+      <label class="fld"><span>Vertical <b id="aYL" class="mono"></b></span><input type="range" id="aY" min="6" max="96" value="90"></label>
+      <div class="colorrow"><input type="color" id="aColor" value="#c6a75e"><span class="mono" id="aColorL">#c6a75e</span></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Spine</p>
+      <label class="fld"><input type="text" id="sText" value="The Purest Gospel — Herzog"></label>
+      <div class="colorrow"><input type="color" id="sColor" value="#f4efe3"><span class="mono" id="sColorL">#f4efe3</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="sFlip"> flip 180°</label></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Back cover</p>
+      <label class="fld"><textarea id="bText" rows="7" placeholder="Back-cover blurb… (blank line = new paragraph)"></textarea></label>
+      <label class="fld">
+        <select id="bFont">
+          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
+          <optgroup label="Sans"><option>Montserrat</option><option>Oswald</option></optgroup>
+        </select>
+      </label>
+      <div class="row">
+        <label class="fld"><span>Size <b id="bSizeL" class="mono"></b></span><input type="range" id="bSize" min="9" max="30" value="16"></label>
+        <label class="fld"><span>Top start <b id="bYL" class="mono"></b></span><input type="range" id="bY" min="2" max="70" value="7"></label>
+      </div>
+      <div class="seg" id="bAlignSeg"><button class="on" data-align="left">Left</button><button data-align="center">Center</button></div>
+      <div class="colorrow" style="margin-top:10px"><input type="color" id="bColor" value="#e9e3d4"><span class="mono" id="bColorL">#e9e3d4</span></div>
+      <p class="mini" style="margin-top:8px">Text auto-flows around the ISBN / barcode keep-clear zone in the lower-right of the back cover — no manual nudging needed.</p>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Export</p>
+      <button class="btn primary" id="expWrap">Download print wrap · PNG @300</button>
+      <button class="btn ghost" id="expEbook">Download ebook front · 1600×2560</button>
+      <p class="mini">Wrap exports at exact KDP pixel dimensions with no guide overlay. Background-removal &amp; a true PDF/X-1a export are the two pieces that want a small server — see the chat notes.</p>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>White <b>0.002252</b>″/pg · Cream <b>0.0025</b>″ · Color <b>0.002347</b>″</span>
+  <span>· bleed <b>0.125</b>″ · safe <b>0.25</b>″ · spine text needs <b>~100</b>+ pages</span>
+  <span style="margin-left:auto">Prototype — verify against KDP before publishing.</span>
+</footer>
+
+<script>
+/* ---------- state ---------- */
+const S = {
+  trimW:6, trimH:9, pages:220, paper:0.002252,
+  img:null, fit:"wrap", palette:[], imgOpacity:1, bg:"#141414", imgScale:1, imgX:0, imgY:0,
+  title:{text:"The Purest Gospel", font:"Playfair Display", size:74, y:20, color:"#f4efe3", shadow:true},
+  author:{text:"Larry Herzog Jr.", font:"Cormorant Garamond", size:30, y:90, color:"#c6a75e"},
+  spine:{text:"The Purest Gospel — Herzog", color:"#f4efe3", flip:false},
+  back:{text:"Paul's letter to the Romans has shaped the church's confession of grace for two thousand years. In this volume the gospel is set forth in its purest form: God's righteousness revealed apart from the law, received by faith alone, for the ungodly.\n\nWritten for confessional Lutheran laity and for anyone wearied by moralism, these expositions move verse by verse through the whole epistle — justification, the bondage of the will, the comfort of election, and the shape of the Christian life lived from faith.\n\nHere is no self-help and no ladder to climb. Here is Christ, delivered in the ordinary means of grace, for you.",
+        font:"EB Garamond", size:16, y:7, color:"#e9e3d4", align:"left"},
+  guides:true, view:"2d", zoom:0 // 0 = fit
+};
+const DPI=300, BLEED=0.125, SAFE=0.25;
+const $=id=>document.getElementById(id);
+let PREV_SCALE=1;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+/* ---------- geometry ---------- */
+function dims(){
+  const spine = S.pages * S.paper;            // visible spine width (in)
+  const fullW = BLEED + S.trimW + spine + S.trimW + BLEED;
+  const fullH = S.trimH + BLEED*2;
+  return {spine, fullW, fullH,
+    pxW:Math.round(fullW*DPI), pxH:Math.round(fullH*DPI),
+    backX:BLEED, frontX:BLEED+S.trimW+spine, spineX:BLEED+S.trimW};
+}
+
+/* ---------- readouts ---------- */
+function updateReadout(){
+  const d=dims();
+  $("oSpine").innerHTML = d.spine.toFixed(4)+' <small>in</small>';
+  $("oFull").innerHTML  = d.fullW.toFixed(3)+' × '+d.fullH.toFixed(3)+' <small>in</small>';
+  $("oPx").textContent  = d.pxW+' × '+d.pxH;
+  const ok = S.pages>=100;
+  $("oSpineText").innerHTML = ok
+    ? '<span style="color:var(--ok)">allowed</span>'
+    : '<span style="color:var(--danger)">too thin</span>';
+  const w=$("spineWarn");
+  if(!ok){ w.classList.add("show");
+    w.textContent="At "+S.pages+" pages the spine is too narrow for reliable text. KDP wants ~100+ pages before spine text prints cleanly — keep the spine blank or solid below that.";
+  } else w.classList.remove("show");
+}
+
+/* ---------- drawing core (resolution-independent via px scale) ---------- */
+function drawCover(ctx, scale, showGuides){
+  const d=dims();
+  const W=d.fullW*scale, H=d.fullH*scale;
+  ctx.clearRect(0,0,W,H);
+
+  // base fill
+  ctx.fillStyle=S.bg; ctx.fillRect(0,0,W,H);
+
+  // artwork (opacity over base, with user pan/zoom)
+  if(S.img){
+    ctx.save(); ctx.globalAlpha=Math.max(0,Math.min(1,S.imgOpacity));
+    const px=S.imgX*scale, py=S.imgY*scale;
+    if(S.fit==="front"){
+      drawImageFit(ctx, S.img, d.frontX*scale, 0, (S.trimW+BLEED)*scale, H, S.imgScale, px, py);
+    } else {
+      drawImageFit(ctx, S.img, 0,0,W,H, S.imgScale, px, py);
+    }
+    ctx.restore();
+  }
+
+  const front={x:d.frontX*scale,y:0,w:S.trimW*scale,h:H};
+
+  // ---- BACK COVER VERBIAGE (flows around barcode zone) ----
+  drawBackText(ctx, scale);
+  // ---- TITLE (front cover) ----
+  drawWrapText(ctx, S.title, front, scale, "title");
+  // ---- AUTHOR ----
+  drawWrapText(ctx, S.author, front, scale, "author");
+
+  // ---- SPINE TEXT ----
+  if(S.spine.text && S.pages>=100){
+    ctx.save();
+    const sx=(d.spineX+d.spine/2)*scale, sy=H/2;
+    ctx.translate(sx,sy); ctx.rotate(S.spine.flip?Math.PI/2:-Math.PI/2);
+    ctx.fillStyle=S.spine.color; ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.font="600 "+ (d.spine*scale*0.5) +"px 'Cormorant Garamond',serif";
+    ctx.fillText(S.spine.text, 0, 0, H*0.82);
+    ctx.restore();
+  }
+
+  if(showGuides) drawGuides(ctx,d,scale,W,H);
+}
+
+function drawWrapText(ctx, o, box, scale, kind){
+  if(!o.text.trim()) return;
+  ctx.save();
+  ctx.fillStyle=o.color; ctx.textAlign="center";
+  const fontPx = Math.max(6, o.size/72*scale);    // size slider is points; 1pt = 1/72"
+  ctx.font=(kind==="title"?"700 ":"600 ")+fontPx+"px '"+o.font+"'";
+  ctx.textBaseline="middle";
+  const cx=box.x+box.w/2;
+  const cy=box.h*(o.y/100);
+  const lines=wrapLines(ctx,o.text,box.w*0.84);
+  const lh=fontPx*1.12;
+  let y=cy-(lines.length-1)*lh/2;
+  for(const ln of lines){
+    if(o.shadow){ctx.save();ctx.fillStyle="rgba(0,0,0,.45)";ctx.fillText(ln,cx+fontPx*0.03,y+fontPx*0.04);ctx.restore();}
+    ctx.fillStyle=o.color; ctx.fillText(ln,cx,y); y+=lh;
+  }
+  ctx.restore();
+}
+/* back cover blurb: wraps top-down in the safe area and flows AROUND
+   the KDP ISBN/barcode keep-clear box in the lower-right of the back */
+function drawBackText(ctx, scale){
+  const o=S.back; if(!o.text.trim()) return;
+  const d=dims();
+  const left  = (BLEED+SAFE)*scale;
+  const right = (d.spineX-SAFE)*scale;
+  const top   = (BLEED+SAFE)*scale;
+  const bottom= (d.fullH-BLEED-SAFE)*scale;
+  const startY= top + (o.y/100)*(d.fullH*scale);
+
+  const g=0.12*scale;                          // gutter around the barcode
+  const bcLeft   = (d.spineX-2.25)*scale;
+  const bcTop    = (d.fullH-1.575)*scale;
+  const bcBottom = (d.fullH-0.375)*scale;
+  const avoidX0  = bcLeft - g;
+  const avoidY0  = bcTop  - g;
+  const avoidY1  = bcBottom;
+
+  const fontPx=Math.max(6, o.size/72*scale);   // points; 1pt = 1/72"
+  const lh=fontPx*1.34;
+  ctx.save();
+  ctx.fillStyle=o.color; ctx.textBaseline="top";
+  ctx.font=fontPx+"px '"+o.font+"'";
+
+  let y=startY;
+  const paras=o.text.split(/\n/);
+  for(let p=0;p<paras.length;p++){
+    const para=paras[p].trim();
+    if(para===""){ y+=lh*0.55; continue; }
+    const words=para.split(/\s+/);
+    let i=0;
+    while(i<words.length){
+      if(y+lh>bottom) break;                            // clamp inside safe bottom
+      const overlaps=(y+lh>avoidY0 && y<avoidY1);        // line band hits barcode rows
+      const rb=overlaps?Math.min(right,avoidX0):right;   // narrow right edge if so
+      const availW=rb-left;
+      let line="", j=i;
+      while(j<words.length){
+        const test=line?line+" "+words[j]:words[j];
+        if(ctx.measureText(test).width>availW && line) break;
+        line=test; j++;
+      }
+      if(line===""){ line=words[i]; j=i+1; }
+      if(o.align==="center"){ ctx.textAlign="center"; ctx.fillText(line,left+availW/2,y); }
+      else { ctx.textAlign="left"; ctx.fillText(line,left,y); }
+      i=j; y+=lh;
+    }
+    y+=lh*0.4;
+    if(y+lh>bottom) break;
+  }
+  ctx.restore();
+}
+function wrapLines(ctx,text,maxW){
+  const words=text.split(/\s+/); const out=[]; let cur="";
+  for(const w of words){
+    const t=cur?cur+" "+w:w;
+    if(ctx.measureText(t).width>maxW && cur){out.push(cur);cur=w;} else cur=t;
+  }
+  if(cur)out.push(cur); return out;
+}
+function drawImageFit(ctx,img,rx,ry,rw,rh,zoom,panXpx,panYpx){
+  zoom=zoom||1; panXpx=panXpx||0; panYpx=panYpx||0;
+  const ir=img.width/img.height, br=rw/rh; let bw,bh;     // base = cover-fit of region
+  if(ir>br){bh=rh;bw=rh*ir;} else {bw=rw;bh=rw/ir;}
+  const dw=bw*zoom, dh=bh*zoom;
+  const dx=rx+(rw-dw)/2+panXpx, dy=ry+(rh-dh)/2+panYpx;
+  ctx.save();ctx.beginPath();ctx.rect(rx,ry,rw,rh);ctx.clip();ctx.drawImage(img,dx,dy,dw,dh);ctx.restore();
+}
+
+function drawGuides(ctx,d,scale,W,H){
+  const I=v=>v*scale;
+  // bleed (outer) — red dashed
+  line(ctx, I(BLEED),0, I(BLEED),H,"#ff5a5a",1,[6,5]);
+  line(ctx, W-I(BLEED),0, W-I(BLEED),H,"#ff5a5a",1,[6,5]);
+  line(ctx, 0,I(BLEED), W,I(BLEED),"#ff5a5a",1,[6,5]);
+  line(ctx, 0,H-I(BLEED), W,H-I(BLEED),"#ff5a5a",1,[6,5]);
+  // spine fold lines — cyan
+  line(ctx, I(d.spineX),0, I(d.spineX),H,"#39d4ff",1.3,[]);
+  line(ctx, I(d.frontX),0, I(d.frontX),H,"#39d4ff",1.3,[]);
+  // safe margin — green dashed: 0.25" inside the trim on all four sides
+  const sy=I(BLEED+SAFE), sh=H-2*I(BLEED+SAFE), sw=(S.trimW-2*SAFE)*scale;
+  rectStroke(ctx, I(BLEED+SAFE), sy, sw, sh,"#54e08a",[5,5]);      // back
+  rectStroke(ctx, I(d.frontX+SAFE), sy, sw, sh,"#54e08a",[5,5]);   // front
+  // barcode zone (back, lower-right) 2 x 1.2 in, .25 from trim edges
+  const bw=I(2),bh=I(1.2);
+  const bx=I(d.spineX)-I(0.25)-bw, by=H-I(BLEED)-I(0.25)-bh;
+  rectStroke(ctx,bx,by,bw,bh,"#ffd166",[4,4]);
+  ctx.fillStyle="rgba(255,209,102,.10)";ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle="#ffd166";ctx.font="10px 'Space Mono'";ctx.textAlign="left";
+  ctx.fillText("ISBN / barcode",bx+6,by+15);ctx.fillText("keep clear",bx+6,by+28);
+  // labels
+  ctx.fillStyle="rgba(255,255,255,.85)";ctx.font="11px 'Space Mono'";ctx.textAlign="center";
+  ctx.fillText("BACK", I(BLEED)+I(S.trimW)/2, 22);
+  ctx.fillText("SPINE", I(d.spineX)+I(d.spine)/2, H-14);
+  ctx.fillText("FRONT", I(d.frontX)+I(S.trimW)/2, 22);
+}
+function line(ctx,x1,y1,x2,y2,c,w,dash){ctx.save();ctx.strokeStyle=c;ctx.lineWidth=w;ctx.setLineDash(dash||[]);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.restore();}
+function rectStroke(ctx,x,y,w,h,c,dash){ctx.save();ctx.strokeStyle=c;ctx.lineWidth=1;ctx.setLineDash(dash||[]);ctx.strokeRect(x,y,w,h);ctx.restore();}
+
+/* ---------- live preview ---------- */
+const cv=$("preview"), cx=cv.getContext("2d");
+function render(){
+  const d=dims();
+  const stageW=Math.min($("view2d").parentElement.clientWidth-40, 760);
+  let scale = stageW / d.fullW;                       // px per inch (fit)
+  if(S.zoom>0) scale = scale*(1+S.zoom*0.35);
+  PREV_SCALE=scale;
+  const W=Math.round(d.fullW*scale), H=Math.round(d.fullH*scale);
+  cv.width=W; cv.height=H;
+  drawCover(cx, scale, S.guides);
+  if(S.view==="3d") build3D();
+}
+
+/* ---------- 3D ---------- */
+function faceCanvas(part){
+  const d=dims(); const sc=300/ d.fullH; // px per inch for 3D textures
+  const c=document.createElement("canvas");
+  let region;
+  if(part==="front") region=[d.frontX,0,S.trimW+BLEED,d.fullH];
+  else if(part==="back") region=[0,0,S.trimW+BLEED,d.fullH];
+  else region=[d.spineX,0,d.spine,d.fullH];
+  c.width=Math.max(2,Math.round(region[2]*sc)); c.height=Math.round(region[3]*sc);
+  const fctx=c.getContext("2d");
+  // draw full cover into temp then copy region — simpler: draw full then crop
+  const tmp=document.createElement("canvas");
+  tmp.width=Math.round(d.fullW*sc); tmp.height=Math.round(d.fullH*sc);
+  drawCover(tmp.getContext("2d"), sc, false);
+  fctx.drawImage(tmp, region[0]*sc, region[1]*sc, region[2]*sc, region[3]*sc, 0,0,c.width,c.height);
+  return c.toDataURL();
+}
+let rotY=-28, rotX=-8, dragging=false, lastX, lastY;
+function build3D(){
+  const d=dims();
+  const book=$("book");
+  const H=300, fW=(S.trimW)/(d.fullH)*H*  (d.fullH/d.fullH); // keep aspect
+  const faceH=H, faceW=(S.trimW)/(S.trimH+BLEED*2)*H, spineW=Math.max(6,(d.spine)/(S.trimH+BLEED*2)*H);
+  book.style.width=faceW+"px"; book.style.height=faceH+"px";
+  book.innerHTML="";
+  const mk=(cls,img,w,tf,extra)=>{
+    const f=document.createElement("div"); f.className="face "+cls;
+    f.style.width=w+"px"; f.style.height=faceH+"px"; f.style.transform=tf;
+    if(img){const im=document.createElement("img");im.src=img;f.appendChild(im);}
+    if(extra)f.style.cssText+=extra;
+    book.appendChild(f); return f;
+  };
+  mk("front",faceCanvas("front"),faceW,`translateZ(${spineW/2}px)`);
+  mk("back",faceCanvas("back"),faceW,`rotateY(180deg) translateZ(${spineW/2}px)`);
+  mk("spine",faceCanvas("spine"),spineW,`rotateY(-90deg) translateZ(${spineW/2}px)`,"left:0;");
+  // pages (right edge)
+  const pg=document.createElement("div"); pg.className="pages";
+  pg.style.cssText+=`width:${spineW}px;right:0;transform:rotateY(90deg) translateZ(${faceW-spineW/2}px);`;
+  book.appendChild(pg);
+  applyRot();
+}
+function applyRot(){const b=$("book");if(b)b.style.transform=`rotateX(${rotX}deg) rotateY(${rotY}deg)`;}
+$("book").addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY;$("book").setPointerCapture(e.pointerId);});
+$("book").addEventListener("pointermove",e=>{if(!dragging)return;rotY+=(e.clientX-lastX)*0.5;rotX-=(e.clientY-lastY)*0.3;rotX=Math.max(-40,Math.min(40,rotX));lastX=e.clientX;lastY=e.clientY;applyRot();});
+$("book").addEventListener("pointerup",()=>dragging=false);
+
+/* ---------- export ---------- */
+function exportWrap(){
+  const d=dims();
+  const c=document.createElement("canvas"); c.width=d.pxW; c.height=d.pxH;
+  drawCover(c.getContext("2d"), DPI, false);
+  dl(c, `kdp-wrap_${S.trimW}x${S.trimH}_${S.pages}pg_${d.pxW}x${d.pxH}.png`);
+}
+function exportEbook(){
+  const W=1600,H=2560; const c=document.createElement("canvas");c.width=W;c.height=H;
+  const ctx=c.getContext("2d");
+  ctx.fillStyle=S.bg;ctx.fillRect(0,0,W,H);
+  if(S.img){ctx.save();ctx.globalAlpha=Math.max(0,Math.min(1,S.imgOpacity));
+    const es=W/(S.trimW+BLEED); drawImageFit(ctx,S.img,0,0,W,H,S.imgScale,S.imgX*es,S.imgY*es);ctx.restore();}
+  const box={x:0,y:0,w:W,h:H};
+  drawWrapText(ctx,{...S.title,size:S.title.size*1.15},box,W/(S.trimW+BLEED),"title");
+  drawWrapText(ctx,S.author,box,W/(S.trimW+BLEED),"author");
+  dl(c,`ebook-front_1600x2560.png`);
+}
+function dl(canvas,name){
+  canvas.toBlob(b=>{const u=URL.createObjectURL(b);const a=document.createElement("a");
+    a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);},"image/png");
+}
+
+/* ---------- palette extraction (simple bucket quantize) ---------- */
+function extractPalette(img){
+  const c=document.createElement("canvas"),n=64; c.width=n;c.height=n;
+  const x=c.getContext("2d"); x.drawImage(img,0,0,n,n);
+  const d=x.getImageData(0,0,n,n).data, map={};
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]<128)continue;
+    const r=d[i]>>4,g=d[i+1]>>4,b=d[i+2]>>4, key=(r<<8)|(g<<4)|b;
+    map[key]=(map[key]||0)+1;
+  }
+  const top=Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k])=>{
+    k=+k; const r=((k>>8)&15)*17,g=((k>>4)&15)*17,b=(k&15)*17;
+    return "#"+[r,g,b].map(v=>v.toString(16).padStart(2,"0")).join("");
+  });
+  S.palette=top; renderSwatches();
+}
+function renderSwatches(){
+  const wrap=$("palette"),host=$("swatches"); host.innerHTML="";
+  if(!S.palette.length){wrap.style.display="none";return;}
+  wrap.style.display="block";
+  S.palette.forEach(hex=>{
+    const s=document.createElement("div");s.className="sw";s.style.background=hex;
+    s.title=hex+" — click for title color";
+    s.onclick=()=>{S.title.color=hex;$("tColor").value=hex;$("tColorL").textContent=hex;render();};
+    host.appendChild(s);
+  });
+}
+
+/* ---------- genre suggestions ---------- */
+const GENRE={
+  theology:{tFont:"Cormorant Garamond",aFont:"EB Garamond",tColor:"#f4efe3",aColor:"#c6a75e"},
+  literary:{tFont:"Playfair Display",aFont:"Cormorant Garamond",tColor:"#f4efe3",aColor:"#d9c9a3"},
+  thriller:{tFont:"Oswald",aFont:"Montserrat",tColor:"#ffffff",aColor:"#e34b4b"},
+  romance:{tFont:"Cormorant Garamond",aFont:"Montserrat",tColor:"#fff0f3",aColor:"#e6a4b4"},
+  scifi:{tFont:"Archivo Black",aFont:"Oswald",tColor:"#dffbff",aColor:"#56c6e0"},
+  nonfic:{tFont:"Montserrat",aFont:"Montserrat",tColor:"#ffffff",aColor:"#f0a830"},
+  academic:{tFont:"Libre Baskerville",aFont:"EB Garamond",tColor:"#f4efe3",aColor:"#b9a36a"}
+};
+
+/* ---------- wiring ---------- */
+function bindSlider(id,labelId,obj,key,fmt){
+  const el=$(id);
+  const sync=()=>{obj[key]=+el.value; if(labelId)$(labelId).textContent=(fmt?fmt(el.value):el.value); render();};
+  el.addEventListener("input",sync); sync();
+}
+function bindColor(id,labelId,obj,key){
+  const el=$(id),lab=$(labelId);
+  el.addEventListener("input",()=>{obj[key]=el.value;lab.textContent=el.value;render();});
+}
+
+$("trim").addEventListener("change",e=>{
+  if(e.target.value==="custom"){$("customWrap").style.display="flex";}
+  else{$("customWrap").style.display="none";const[w,h]=e.target.value.split(",").map(Number);S.trimW=w;S.trimH=h;}
+  updateReadout();render();
+});
+$("cw").addEventListener("input",e=>{S.trimW=+e.target.value;updateReadout();render();});
+$("ch").addEventListener("input",e=>{S.trimH=+e.target.value;updateReadout();render();});
+$("pages").addEventListener("input",e=>{S.pages=+e.target.value||24;updateReadout();render();});
+$("paper").addEventListener("change",e=>{S.paper=+e.target.value;updateReadout();render();});
+
+$("tTitle").addEventListener("input",e=>{S.title.text=e.target.value;render();});
+$("tFont").addEventListener("change",e=>{S.title.font=e.target.value;render();});
+$("tShadow").addEventListener("change",e=>{S.title.shadow=e.target.checked;render();});
+bindSlider("tSize","tSizeL",S.title,"size",v=>v+" pt");
+bindSlider("tY","tYL",S.title,"y",v=>v+"%");
+bindColor("tColor","tColorL",S.title,"color");
+
+$("aText").addEventListener("input",e=>{S.author.text=e.target.value;render();});
+$("aFont").addEventListener("change",e=>{S.author.font=e.target.value;render();});
+bindSlider("aSize","aSizeL",S.author,"size",v=>v+" pt");
+bindSlider("aY","aYL",S.author,"y",v=>v+"%");
+bindColor("aColor","aColorL",S.author,"color");
+
+$("sText").addEventListener("input",e=>{S.spine.text=e.target.value;render();});
+bindColor("sColor","sColorL",S.spine,"color");
+$("sFlip").addEventListener("change",e=>{S.spine.flip=e.target.checked;render();});
+
+/* image opacity + base color */
+$("opacity").addEventListener("input",e=>{S.imgOpacity=+e.target.value/100;$("opL").textContent=e.target.value+"%";render();});
+$("opL").textContent="100%";
+bindColor("bgColor","bgColorL",S,"bg");
+
+/* back cover */
+$("bText").value=S.back.text;
+$("bText").addEventListener("input",e=>{S.back.text=e.target.value;render();});
+$("bFont").addEventListener("change",e=>{S.back.font=e.target.value;render();});
+bindSlider("bSize","bSizeL",S.back,"size",v=>v+" pt");
+bindSlider("bY","bYL",S.back,"y",v=>v+"%");
+bindColor("bColor","bColorL",S.back,"color");
+document.querySelectorAll("#bAlignSeg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#bAlignSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  S.back.align=b.dataset.align;render();
+}));
+
+$("guides").addEventListener("change",e=>{S.guides=e.target.checked;render();});
+
+document.querySelectorAll("#viewSeg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#viewSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  S.view=b.dataset.view;
+  $("view2d").style.display=S.view==="2d"?"block":"none";
+  $("view3d").style.display=S.view==="3d"?"block":"none";
+  render();
+}));
+document.querySelectorAll("#fitSeg button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("#fitSeg button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  S.fit=b.dataset.fit;render();
+}));
+
+$("zin").onclick=()=>{S.zoom=Math.min(6,S.zoom+1);$("zlabel").textContent=S.zoom?("+"+S.zoom):"fit";render();};
+$("zout").onclick=()=>{S.zoom=Math.max(0,S.zoom-1);$("zlabel").textContent=S.zoom?("+"+S.zoom):"fit";render();};
+
+$("applyGenre").onclick=()=>{
+  const g=GENRE[$("genre").value]; if(!g)return;
+  S.title.font=g.tFont;$("tFont").value=g.tFont;
+  S.author.font=g.aFont;$("aFont").value=g.aFont;
+  S.title.color=g.tColor;$("tColor").value=g.tColor;$("tColorL").textContent=g.tColor;
+  S.author.color=g.aColor;$("aColor").value=g.aColor;$("aColorL").textContent=g.aColor;
+  render();
+};
+
+/* file upload */
+const drop=$("drop"),file=$("file");
+drop.onclick=()=>file.click();
+file.onchange=e=>loadImg(e.target.files[0]);
+["dragover","dragenter"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.style.borderColor="var(--brass)";}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.style.borderColor="";}));
+drop.addEventListener("drop",e=>{if(e.dataTransfer.files[0])loadImg(e.dataTransfer.files[0]);});
+function loadImg(f){
+  if(!f)return; const r=new FileReader();
+  r.onload=()=>{const img=new Image();img.onload=()=>{
+    S.img=img;$("thumb").classList.add("show");$("thumbImg").src=img.src;
+    S.imgScale=1;S.imgX=0;S.imgY=0;$("scale").value=100;$("scaleL").textContent="100%";
+    cv.style.cursor="grab";
+    extractPalette(img);render();
+  };img.src=r.result;};
+  r.readAsDataURL(f);
+}
+
+$("expWrap").onclick=exportWrap;
+$("expEbook").onclick=exportEbook;
+
+/* image size + position: slider, reset, drag to pan, scroll to zoom */
+$("scale").addEventListener("input",e=>{S.imgScale=+e.target.value/100;$("scaleL").textContent=e.target.value+"%";render();});
+$("imgReset").onclick=()=>{S.imgScale=1;S.imgX=0;S.imgY=0;$("scale").value=100;$("scaleL").textContent="100%";render();};
+
+let imgDrag=false,ix,iy;
+cv.addEventListener("pointerdown",e=>{if(!S.img)return;imgDrag=true;ix=e.clientX;iy=e.clientY;cv.setPointerCapture(e.pointerId);cv.style.cursor="grabbing";});
+cv.addEventListener("pointermove",e=>{if(!imgDrag)return;const r=cv.getBoundingClientRect();
+  S.imgX+=(e.clientX-ix)*(cv.width/r.width)/PREV_SCALE;
+  S.imgY+=(e.clientY-iy)*(cv.height/r.height)/PREV_SCALE;
+  ix=e.clientX;iy=e.clientY;render();});
+cv.addEventListener("pointerup",()=>{imgDrag=false;cv.style.cursor=S.img?"grab":"default";});
+cv.addEventListener("wheel",e=>{
+  if(!S.img)return; e.preventDefault();
+  const r=cv.getBoundingClientRect();
+  const sx=cv.width/r.width, sy=cv.height/r.height;
+  const px=(e.clientX-r.left)*sx, py=(e.clientY-r.top)*sy, scale=PREV_SCALE, d=dims();
+  let rx,ry,rw,rh;
+  if(S.fit==="front"){rx=d.frontX*scale;ry=0;rw=(S.trimW+BLEED)*scale;rh=d.fullH*scale;}
+  else{rx=0;ry=0;rw=d.fullW*scale;rh=d.fullH*scale;}
+  const ir=S.img.width/S.img.height, br=rw/rh; let bw,bh;
+  if(ir>br){bh=rh;bw=rh*ir;} else {bw=rw;bh=rw/ir;}
+  const z0=S.imgScale;
+  const dx0=rx+(rw-bw*z0)/2+S.imgX*scale, dy0=ry+(rh-bh*z0)/2+S.imgY*scale;
+  const fx=(px-dx0)/(bw*z0), fy=(py-dy0)/(bh*z0);     // image fraction under cursor
+  const z1=clamp(z0*(e.deltaY<0?1.1:1/1.1),0.2,8);
+  S.imgScale=z1;
+  S.imgX=(px - fx*bw*z1 - rx - (rw-bw*z1)/2)/scale;   // keep that fraction under cursor
+  S.imgY=(py - fy*bh*z1 - ry - (rh-bh*z1)/2)/scale;
+  $("scale").value=Math.round(z1*100);$("scaleL").textContent=Math.round(z1*100)+"%";
+  render();
+},{passive:false});
+
+/* ---------- boot ---------- */
+updateReadout();
+document.fonts.ready.then(render);
+window.addEventListener("resize",()=>{clearTimeout(window._rt);window._rt=setTimeout(render,120);});
+setTimeout(render,300);
+</script>
+</body>
+</html>

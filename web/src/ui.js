@@ -4,7 +4,10 @@
 // to state and re-renders.
 
 import { S } from "./state.js";
-import { dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED } from "./kdp.js";
+import {
+  dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED,
+  imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
+} from "./kdp.js";
 import { render, drawCover, getPrevScale, rotateBy } from "./render.js";
 import { exportWrap, exportEbook } from "./export.js";
 import { ensureFontsLoaded } from "./fonts.js";
@@ -12,6 +15,53 @@ import { ensureFontsLoaded } from "./fonts.js";
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const cv = $("preview");
+
+// Single render funnel: redraw the canvas, then refresh the pre-flight notices.
+function rerender() {
+  render();
+  updateNotices();
+}
+
+/* ---------- pre-flight notices (effective DPI + CMYK gamut) ---------- */
+function setNotice(el, severity, html) {
+  el.className = "notice" + (severity ? " " + severity : "");
+  if (html == null) return;
+  el.classList.add("show");
+  el.innerHTML = html;
+}
+function updateNotices() {
+  // Effective DPI of the placed background image (invariant: native px / placed in).
+  const dn = $("dpiNote");
+  if (S.img) {
+    const d = dims(S);
+    const r = imageRegion(d, S.fit);
+    const dpi = Math.round(effectiveDPI({ imgW: S.img.width, imgH: S.img.height, regionWin: r.w, regionHin: r.h, zoom: S.imgScale }));
+    const sev = dpiSeverity(dpi);
+    const msg = sev === "ok"
+      ? `Effective resolution <b>${dpi}</b> DPI — at or above the ${DPI_MIN} DPI print minimum.`
+      : sev === "warn"
+        ? `Effective resolution <b>${dpi}</b> DPI — below the ${DPI_MIN} DPI minimum; may look soft in print. Use a larger image or zoom out.`
+        : `Effective resolution <b>${dpi}</b> DPI — below ${DPI_FLOOR} DPI; will print blurry. Use a much larger image.`;
+    setNotice(dn, sev, msg);
+  } else {
+    setNotice(dn, "", null);
+    dn.classList.remove("show");
+  }
+
+  // CMYK gamut risk across the cover's colors.
+  const cn = $("cmykNote");
+  const labels = [["title", S.title.color], ["author", S.author.color], ["spine", S.spine.color], ["back text", S.back.color], ["base color", S.bg]];
+  const risky = labels.filter(([, hex]) => cmykRisk(hex)).map(([name]) => name);
+  if (risky.length) {
+    setNotice(cn, "warn",
+      `Saturated color${risky.length > 1 ? "s" : ""} (<b>${risky.join(", ")}</b>) may shift noticeably converting RGB→CMYK on press. Consider muting, and order a proof.`);
+    $("preflightOk").style.display = "none";
+  } else {
+    setNotice(cn, "", null);
+    cn.classList.remove("show");
+    $("preflightOk").style.display = "block";
+  }
+}
 
 /* ---------- readouts ---------- */
 function updateReadout() {
@@ -65,7 +115,7 @@ function renderSwatches() {
   S.palette.forEach((hex) => {
     const s = document.createElement("div"); s.className = "sw"; s.style.background = hex;
     s.title = hex + " — click for title color";
-    s.onclick = () => { S.title.color = hex; $("tColor").value = hex; $("tColorL").textContent = hex; render(); };
+    s.onclick = () => { S.title.color = hex; $("tColor").value = hex; $("tColorL").textContent = hex; rerender(); };
     host.appendChild(s);
   });
 }
@@ -73,77 +123,77 @@ function renderSwatches() {
 /* ---------- generic control binders ---------- */
 function bindSlider(id, labelId, obj, key, fmt) {
   const el = $(id);
-  const sync = () => { obj[key] = +el.value; if (labelId) $(labelId).textContent = (fmt ? fmt(el.value) : el.value); render(); };
+  const sync = () => { obj[key] = +el.value; if (labelId) $(labelId).textContent = (fmt ? fmt(el.value) : el.value); rerender(); };
   el.addEventListener("input", sync); sync();
 }
 function bindColor(id, labelId, obj, key) {
   const el = $(id), lab = $(labelId);
-  el.addEventListener("input", () => { obj[key] = el.value; lab.textContent = el.value; render(); });
+  el.addEventListener("input", () => { obj[key] = el.value; lab.textContent = el.value; rerender(); });
 }
 
 /* ---------- book spec ---------- */
 $("trim").addEventListener("change", (e) => {
   if (e.target.value === "custom") { $("customWrap").style.display = "flex"; }
   else { $("customWrap").style.display = "none"; const [w, h] = e.target.value.split(",").map(Number); S.trimW = w; S.trimH = h; }
-  updateReadout(); render();
+  updateReadout(); rerender();
 });
-$("cw").addEventListener("input", (e) => { S.trimW = +e.target.value; updateReadout(); render(); });
-$("ch").addEventListener("input", (e) => { S.trimH = +e.target.value; updateReadout(); render(); });
-$("pages").addEventListener("input", (e) => { S.pages = +e.target.value || 24; updateReadout(); render(); });
-$("paper").addEventListener("change", (e) => { S.paper = +e.target.value; updateReadout(); render(); });
+$("cw").addEventListener("input", (e) => { S.trimW = +e.target.value; updateReadout(); rerender(); });
+$("ch").addEventListener("input", (e) => { S.trimH = +e.target.value; updateReadout(); rerender(); });
+$("pages").addEventListener("input", (e) => { S.pages = +e.target.value || 24; updateReadout(); rerender(); });
+$("paper").addEventListener("change", (e) => { S.paper = +e.target.value; updateReadout(); rerender(); });
 
 /* ---------- title ---------- */
-$("tTitle").addEventListener("input", (e) => { S.title.text = e.target.value; render(); });
-$("tFont").addEventListener("change", (e) => { S.title.font = e.target.value; render(); });
-$("tShadow").addEventListener("change", (e) => { S.title.shadow = e.target.checked; render(); });
+$("tTitle").addEventListener("input", (e) => { S.title.text = e.target.value; rerender(); });
+$("tFont").addEventListener("change", (e) => { S.title.font = e.target.value; rerender(); });
+$("tShadow").addEventListener("change", (e) => { S.title.shadow = e.target.checked; rerender(); });
 bindSlider("tSize", "tSizeL", S.title, "size", (v) => v + " pt");
 bindSlider("tY", "tYL", S.title, "y", (v) => v + "%");
 bindColor("tColor", "tColorL", S.title, "color");
 
 /* ---------- author ---------- */
-$("aText").addEventListener("input", (e) => { S.author.text = e.target.value; render(); });
-$("aFont").addEventListener("change", (e) => { S.author.font = e.target.value; render(); });
+$("aText").addEventListener("input", (e) => { S.author.text = e.target.value; rerender(); });
+$("aFont").addEventListener("change", (e) => { S.author.font = e.target.value; rerender(); });
 bindSlider("aSize", "aSizeL", S.author, "size", (v) => v + " pt");
 bindSlider("aY", "aYL", S.author, "y", (v) => v + "%");
 bindColor("aColor", "aColorL", S.author, "color");
 
 /* ---------- spine ---------- */
-$("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; render(); });
+$("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; rerender(); });
 bindColor("sColor", "sColorL", S.spine, "color");
-$("sFlip").addEventListener("change", (e) => { S.spine.flip = e.target.checked; render(); });
+$("sFlip").addEventListener("change", (e) => { S.spine.flip = e.target.checked; rerender(); });
 
 /* ---------- image opacity + base color ---------- */
-$("opacity").addEventListener("input", (e) => { S.imgOpacity = +e.target.value / 100; $("opL").textContent = e.target.value + "%"; render(); });
+$("opacity").addEventListener("input", (e) => { S.imgOpacity = +e.target.value / 100; $("opL").textContent = e.target.value + "%"; rerender(); });
 $("opL").textContent = "100%";
 bindColor("bgColor", "bgColorL", S, "bg");
 
 /* ---------- back cover ---------- */
 $("bText").value = S.back.text;
-$("bText").addEventListener("input", (e) => { S.back.text = e.target.value; render(); });
-$("bFont").addEventListener("change", (e) => { S.back.font = e.target.value; render(); });
+$("bText").addEventListener("input", (e) => { S.back.text = e.target.value; rerender(); });
+$("bFont").addEventListener("change", (e) => { S.back.font = e.target.value; rerender(); });
 bindSlider("bSize", "bSizeL", S.back, "size", (v) => v + " pt");
 bindSlider("bY", "bYL", S.back, "y", (v) => v + "%");
 bindColor("bColor", "bColorL", S.back, "color");
 document.querySelectorAll("#bAlignSeg button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll("#bAlignSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
-  S.back.align = b.dataset.align; render();
+  S.back.align = b.dataset.align; rerender();
 }));
 
 /* ---------- stage controls ---------- */
-$("guides").addEventListener("change", (e) => { S.guides = e.target.checked; render(); });
+$("guides").addEventListener("change", (e) => { S.guides = e.target.checked; rerender(); });
 document.querySelectorAll("#viewSeg button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll("#viewSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
   S.view = b.dataset.view;
   $("view2d").style.display = S.view === "2d" ? "block" : "none";
   $("view3d").style.display = S.view === "3d" ? "block" : "none";
-  render();
+  rerender();
 }));
 document.querySelectorAll("#fitSeg button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll("#fitSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
-  S.fit = b.dataset.fit; render();
+  S.fit = b.dataset.fit; rerender();
 }));
-$("zin").onclick = () => { S.zoom = Math.min(6, S.zoom + 1); $("zlabel").textContent = S.zoom ? ("+" + S.zoom) : "fit"; render(); };
-$("zout").onclick = () => { S.zoom = Math.max(0, S.zoom - 1); $("zlabel").textContent = S.zoom ? ("+" + S.zoom) : "fit"; render(); };
+$("zin").onclick = () => { S.zoom = Math.min(6, S.zoom + 1); $("zlabel").textContent = S.zoom ? ("+" + S.zoom) : "fit"; rerender(); };
+$("zout").onclick = () => { S.zoom = Math.max(0, S.zoom - 1); $("zlabel").textContent = S.zoom ? ("+" + S.zoom) : "fit"; rerender(); };
 
 /* ---------- genre ---------- */
 $("applyGenre").onclick = () => {
@@ -152,7 +202,7 @@ $("applyGenre").onclick = () => {
   S.author.font = g.aFont; $("aFont").value = g.aFont;
   S.title.color = g.tColor; $("tColor").value = g.tColor; $("tColorL").textContent = g.tColor;
   S.author.color = g.aColor; $("aColor").value = g.aColor; $("aColorL").textContent = g.aColor;
-  render();
+  rerender();
 };
 
 /* ---------- file upload ---------- */
@@ -170,7 +220,7 @@ function loadImg(f) {
       S.img = img; $("thumb").classList.add("show"); $("thumbImg").src = img.src;
       S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%";
       cv.style.cursor = "grab";
-      extractPalette(img); render();
+      extractPalette(img); rerender();
     };
     img.src = r.result;
   };
@@ -182,8 +232,8 @@ $("expWrap").onclick = exportWrap;
 $("expEbook").onclick = exportEbook;
 
 /* ---------- image size + position: slider, reset, drag to pan, scroll to zoom ---------- */
-$("scale").addEventListener("input", (e) => { S.imgScale = +e.target.value / 100; $("scaleL").textContent = e.target.value + "%"; render(); });
-$("imgReset").onclick = () => { S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%"; render(); };
+$("scale").addEventListener("input", (e) => { S.imgScale = +e.target.value / 100; $("scaleL").textContent = e.target.value + "%"; rerender(); });
+$("imgReset").onclick = () => { S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%"; rerender(); };
 
 let imgDrag = false, ix, iy;
 cv.addEventListener("pointerdown", (e) => { if (!S.img) return; imgDrag = true; ix = e.clientX; iy = e.clientY; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
@@ -191,7 +241,7 @@ cv.addEventListener("pointermove", (e) => {
   if (!imgDrag) return; const r = cv.getBoundingClientRect();
   S.imgX += (e.clientX - ix) * (cv.width / r.width) / getPrevScale();
   S.imgY += (e.clientY - iy) * (cv.height / r.height) / getPrevScale();
-  ix = e.clientX; iy = e.clientY; render();
+  ix = e.clientX; iy = e.clientY; rerender();
 });
 cv.addEventListener("pointerup", () => { imgDrag = false; cv.style.cursor = S.img ? "grab" : "default"; });
 cv.addEventListener("wheel", (e) => {
@@ -212,7 +262,7 @@ cv.addEventListener("wheel", (e) => {
   S.imgX = (px - fx * bw * z1 - rx - (rw - bw * z1) / 2) / scale;     // keep that fraction under cursor
   S.imgY = (py - fy * bh * z1 - ry - (rh - bh * z1) / 2) / scale;
   $("scale").value = Math.round(z1 * 100); $("scaleL").textContent = Math.round(z1 * 100) + "%";
-  render();
+  rerender();
 }, { passive: false });
 
 /* ---------- 3D drag-to-rotate ---------- */
@@ -224,6 +274,6 @@ book.addEventListener("pointerup", () => { dragging = false; });
 
 /* ---------- boot ---------- */
 updateReadout();
-ensureFontsLoaded().then(render);
-window.addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(render, 120); });
-setTimeout(render, 300);
+ensureFontsLoaded().then(rerender);
+window.addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(rerender, 120); });
+setTimeout(rerender, 300);

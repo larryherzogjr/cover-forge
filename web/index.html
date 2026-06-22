@@ -105,6 +105,14 @@
     border-radius:8px;padding:9px 11px;margin-top:10px}
   .warn.show{display:block}
 
+  .notice{display:none;font-size:11.5px;line-height:1.45;border-radius:8px;padding:8px 10px;
+    margin-top:10px;border:1px solid var(--line);color:var(--muted)}
+  .notice.show{display:block}
+  .notice.ok{color:var(--ok);border-color:rgba(134,178,154,.3);background:rgba(134,178,154,.07)}
+  .notice.warn{color:var(--brass-bright);border-color:var(--line-strong);background:rgba(198,167,94,.07)}
+  .notice.bad{color:var(--danger);border-color:rgba(217,138,111,.3);background:rgba(217,138,111,.08)}
+  .notice b{font-family:"Space Mono",monospace;font-weight:700}
+
   .swatches{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
   .sw{width:30px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.18);cursor:pointer;position:relative;transition:transform .12s}
   .sw:hover{transform:translateY(-2px)}
@@ -278,6 +286,7 @@
       <label class="fld" style="margin-top:12px"><span>Image size <b id="scaleL" class="mono">100%</b></span><input type="range" id="scale" min="20" max="800" value="100"></label>
       <button class="btn ghost" id="imgReset" style="padding:8px;font-size:12px;margin-bottom:0">Reset image position</button>
       <p class="mini" style="margin-top:8px">Drag the preview to move the art · scroll over it to zoom at the cursor.</p>
+      <div class="notice" id="dpiNote"></div>
       <div id="palette" style="margin-top:14px;display:none">
         <span class="mini">Extracted palette — click to use as text color</span>
         <div class="swatches" id="swatches"></div>
@@ -335,6 +344,12 @@
       <div class="seg" id="bAlignSeg"><button class="on" data-align="left">Left</button><button data-align="center">Center</button></div>
       <div class="colorrow" style="margin-top:10px"><input type="color" id="bColor" value="#e9e3d4"><span class="mono" id="bColorL">#e9e3d4</span></div>
       <p class="mini" style="margin-top:8px">Text auto-flows around the ISBN / barcode keep-clear zone in the lower-right of the back cover — no manual nudging needed.</p>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Pre-flight</p>
+      <div class="notice" id="cmykNote"></div>
+      <p class="mini" id="preflightOk" style="margin-top:8px">Colors look print-safe. On-screen RGB still shifts on press — order a proof.</p>
     </div>
 
     <div class="grp">

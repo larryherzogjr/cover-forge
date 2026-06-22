@@ -72,3 +72,61 @@ export const spineTextAllowed = (pages) => pages >= SPINE_TEXT_MIN_PAGES;
 // Point-based font size -> pixels at a given px-per-inch scale (invariant #1).
 // Never multiply by DPI again on top of pxPerInch.
 export const fontPx = (sizePt, pxPerInch) => (sizePt / 72) * pxPerInch;
+
+/* ---------- pre-flight: effective DPI of the placed background ---------- */
+
+export const DPI_MIN = 300;    // KDP minimum; below this, warn (soft)
+export const DPI_FLOOR = 200;  // below this, hard-warn (will look bad)
+
+// The inches-region the background image is fit into, by fit mode.
+export function imageRegion(d, fit) {
+  return fit === "front"
+    ? { w: d.trimW + BLEED, h: d.fullH }
+    : { w: d.fullW, h: d.fullH };
+}
+
+// Effective DPI of a cover-fit image placed into a region at a zoom multiplier.
+// = native pixels / placed inches. Aspect is preserved, so x == y; return one.
+export function effectiveDPI({ imgW, imgH, regionWin, regionHin, zoom }) {
+  const z = zoom || 1;
+  const ir = imgW / imgH, br = regionWin / regionHin;
+  const baseWin = ir > br ? regionHin * ir : regionWin; // cover-fit width (in)
+  return imgW / (baseWin * z);
+}
+
+export const dpiSeverity = (dpi) =>
+  dpi >= DPI_MIN ? "ok" : dpi >= DPI_FLOOR ? "warn" : "bad";
+
+/* ---------- pre-flight: CMYK gamut risk for saturated colors ---------- */
+// Print is CMYK; vivid, bright RGB colors (esp. blues/greens) shift on press.
+// This is a soft, non-blocking heuristic — KDP's proof is the real check.
+
+export const CMYK_SAT_RISK = 0.7; // HSV saturation at/above which we flag
+export const CMYK_VAL_RISK = 0.5; // ...combined with this brightness
+
+export function hexToRgb(hex) {
+  let h = String(hex).trim().replace(/^#/, "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const n = parseInt(h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+export function rgbToHsv(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const R = r / 255, G = g / 255, B = b / 255;
+  const max = Math.max(R, G, B), min = Math.min(R, G, B), c = max - min;
+  let h = 0;
+  if (c !== 0) {
+    if (max === R) h = ((G - B) / c) % 6;
+    else if (max === G) h = (B - R) / c + 2;
+    else h = (R - G) / c + 4;
+    h /= 6; if (h < 0) h += 1;
+  }
+  return { h, s: max === 0 ? 0 : c / max, v: max };
+}
+
+// True if a color is vivid/bright enough to shift noticeably in CMYK print.
+export function cmykRisk(hex) {
+  const { s, v } = rgbToHsv(hex);
+  return s >= CMYK_SAT_RISK && v >= CMYK_VAL_RISK;
+}

@@ -7,7 +7,10 @@ import assert from "node:assert/strict";
 import {
   DPI, BLEED, SAFE, PAPER, SPINE_TEXT_MIN_PAGES,
   BARCODE_W, BARCODE_H, BARCODE_MARGIN,
+  DPI_MIN, DPI_FLOOR,
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
+  imageRegion, effectiveDPI, dpiSeverity,
+  hexToRgb, rgbToHsv, cmykRisk,
 } from "../src/kdp.js";
 
 const near = (a, b, eps = 1e-9) =>
@@ -96,4 +99,56 @@ test("exported pixel dims == round(full * DPI)", () => {
   const d = dims({ trimW: 8.5, trimH: 11, pages: 300, paper: PAPER.color });
   assert.equal(d.pxW, Math.round(d.fullW * DPI));
   assert.equal(d.pxH, Math.round(d.fullH * DPI));
+});
+
+test("imageRegion: wrap covers the full wrap; front covers trim+bleed", () => {
+  const d = dims({ trimW: 6, trimH: 9, pages: 220, paper: PAPER.white });
+  const wrap = imageRegion(d, "wrap");
+  near(wrap.w, d.fullW); near(wrap.h, d.fullH);
+  const front = imageRegion(d, "front");
+  near(front.w, 6 + BLEED); near(front.h, d.fullH);
+});
+
+test("effectiveDPI: native px over placed inches, aspect-preserved", () => {
+  // Image exactly the wrap's aspect, placed at zoom 1: dpi = imgW / fullW.
+  const d = dims({ trimW: 6, trimH: 9, pages: 220, paper: PAPER.white });
+  const r = imageRegion(d, "wrap");
+  // a tall-ish image that's wider than the region -> fit by height
+  const dpi = effectiveDPI({ imgW: 3000, imgH: 2000, regionWin: r.w, regionHin: r.h, zoom: 1 });
+  // region ratio 12.745/9.25 = 1.378; img ratio 1.5 > br -> baseW = regionH*ir
+  const baseWin = r.h * (3000 / 2000);
+  near(dpi, 3000 / baseWin);
+  // zooming in halves effective DPI of the doubled placement
+  const dpi2 = effectiveDPI({ imgW: 3000, imgH: 2000, regionWin: r.w, regionHin: r.h, zoom: 2 });
+  near(dpi2, dpi / 2);
+});
+
+test("dpiSeverity thresholds", () => {
+  assert.equal(dpiSeverity(DPI_MIN), "ok");
+  assert.equal(dpiSeverity(350), "ok");
+  assert.equal(dpiSeverity(250), "warn");
+  assert.equal(dpiSeverity(DPI_FLOOR), "warn");
+  assert.equal(dpiSeverity(150), "bad");
+});
+
+test("hexToRgb handles #rrggbb and #rgb", () => {
+  assert.deepEqual(hexToRgb("#ff8800"), { r: 255, g: 136, b: 0 });
+  assert.deepEqual(hexToRgb("#f80"), { r: 255, g: 136, b: 0 });
+  assert.deepEqual(hexToRgb("000000"), { r: 0, g: 0, b: 0 });
+});
+
+test("rgbToHsv basics", () => {
+  const red = rgbToHsv("#ff0000");
+  near(red.s, 1); near(red.v, 1);
+  const white = rgbToHsv("#ffffff");
+  near(white.s, 0); near(white.v, 1);
+});
+
+test("cmykRisk flags vivid colors, spares brand navy/gold/paper", () => {
+  assert.equal(cmykRisk("#ff0000"), true);   // pure red
+  assert.equal(cmykRisk("#0000ff"), true);   // pure blue
+  assert.equal(cmykRisk("#00ff66"), true);   // vivid green
+  assert.equal(cmykRisk("#0e1a2b"), false);  // brand navy (too dark)
+  assert.equal(cmykRisk("#c6a75e"), false);  // brass/gold (moderate sat)
+  assert.equal(cmykRisk("#f4efe3"), false);  // paper (low sat)
 });

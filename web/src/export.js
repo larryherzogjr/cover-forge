@@ -43,6 +43,26 @@ function dl(canvas, name) {
   }, "image/png");
 }
 
+// Background removal via the server. Posts an image data URL, returns the
+// cutout (RGBA PNG) as a data URL. Throws on failure so the caller can degrade
+// (the server feature is optional — see /api/remove-bg). The caller turns the
+// returned cutout into an overlay layer.
+export async function removeBackground(imageDataUrl) {
+  const image_base64 = imageDataUrl.split(",")[1];
+  const res = await fetch(API_BASE + "/api/remove-bg", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_base64 }),
+  });
+  if (!res.ok) {
+    let detail = res.status + " " + res.statusText;
+    try { const j = await res.json(); if (j && j.error) detail = j.error + (j.detail ? " — " + j.detail : ""); } catch (_) { /* non-JSON */ }
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  return await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error("could not read the cutout")); r.readAsDataURL(blob); });
+}
+
 function dlBlob(blob, name) {
   const u = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000);

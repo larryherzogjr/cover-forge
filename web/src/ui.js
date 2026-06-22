@@ -9,7 +9,7 @@ import {
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
 } from "./kdp.js";
 import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
-import { exportWrap, exportEbook, exportPDF } from "./export.js";
+import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
 import { ensureFontsLoaded } from "./fonts.js";
 
 const $ = (id) => document.getElementById(id);
@@ -292,16 +292,20 @@ const loadImageAsync = (src) => new Promise((res) => { const im = new Image(); i
 const newOverlayId = () => "ov_" + Date.now().toString(36) + "_" + Math.floor(Math.random() * 1e4).toString(36);
 const selectedOverlay = () => (S.selected && S.selected.startsWith("overlay:")) ? overlayById(S.selected.slice(8)) : null;
 
+async function addOverlayFromSrc(src, widthFrac) {
+  const img = await loadImageAsync(src);
+  if (!img) return null;
+  const d = dims(S);
+  const ov = { id: newOverlayId(), src, img, w: S.trimW * (widthFrac || 0.4), cx: d.frontX + S.trimW / 2, cy: d.fullH * 0.5, opacity: 1, blend: "source-over" };
+  S.overlays.push(ov);
+  S.selected = "overlay:" + ov.id;
+  updateOverlayPanel(); rerender();
+  return ov;
+}
 async function addOverlayFromFile(f) {
   if (!f) return;
   const src = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(f); });
-  if (!src) return;
-  const img = await loadImageAsync(src);
-  if (!img) { setProjStatus("bad", "Could not read that image."); return; }
-  const d = dims(S);
-  S.overlays.push({ id: newOverlayId(), src, img, w: S.trimW * 0.4, cx: d.frontX + S.trimW / 2, cy: d.fullH * 0.5, opacity: 1, blend: "source-over" });
-  S.selected = "overlay:" + S.overlays[S.overlays.length - 1].id;
-  updateOverlayPanel(); rerender();
+  if (!src || !(await addOverlayFromSrc(src))) setProjStatus("bad", "Could not read that image.");
 }
 
 function updateOverlayPanel() {
@@ -335,6 +339,23 @@ $("ovW").addEventListener("input", (e) => { const ov = selectedOverlay(); if (ov
 $("ovOp").addEventListener("input", (e) => { const ov = selectedOverlay(); if (ov) { ov.opacity = +e.target.value / 100; $("ovOpL").textContent = e.target.value + "%"; rerender(); } });
 $("ovBlend").addEventListener("change", (e) => { const ov = selectedOverlay(); if (ov) { ov.blend = e.target.value; rerender(); } });
 $("ovDel").onclick = () => { const ov = selectedOverlay(); if (!ov) return; S.overlays = S.overlays.filter((o) => o !== ov); S.selected = null; updateOverlayPanel(); rerender(); };
+
+/* ---------- background removal (server -> overlay layer) ---------- */
+$("removeBg").onclick = async () => {
+  const btn = $("removeBg"), st = $("bgRemoveStatus");
+  if (!S.img) { setNotice(st, "warn", "Load a background image first, then remove its background."); return; }
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Removing background…"; st.classList.remove("show");
+  try {
+    const cutout = await removeBackground(S.img.src);
+    await addOverlayFromSrc(cutout, 0.6); // place the cut-out subject as an overlay
+    setNotice(st, "ok", "Background removed — added as an overlay layer; drag to position.");
+  } catch (e) {
+    setNotice(st, "bad", `Background removal unavailable: ${e.message}. It needs the Cover Forge API with rembg (the GPU box) — see server/. Everything else works offline.`);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+};
 
 /* ---------- export ---------- */
 $("expWrap").onclick = exportWrap;

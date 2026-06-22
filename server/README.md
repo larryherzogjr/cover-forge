@@ -7,7 +7,7 @@ Small Flask service for the two features that can't run in the browser.
 | Method | Path | Purpose | Status |
 |--------|------|---------|--------|
 | GET  | `/api/health`    | liveness | done |
-| POST | `/api/remove-bg` | isolate subject (rembg/BiRefNet) | stub: echoes input |
+| POST | `/api/remove-bg` | isolate subject (rembg) | done (503 if rembg absent) |
 | POST | `/api/export-pdf`| 300-DPI render -> print PDF | done (RGB + CMYK) |
 
 See contracts (request/response shapes) in the docstrings in `app.py`.
@@ -23,9 +23,11 @@ curl -s http://127.0.0.1:5004/api/health
 
 ## Implementation notes
 
-- **remove-bg:** lazy-import the model and load it once at module scope; don't
-  reload per request. Run on the GPU box with `onnxruntime-gpu`. Pre-warm on
-  startup. Return RGBA PNG.
+- **remove-bg:** done — lazy `from rembg import remove` + a cached `new_session`
+  (model via `CF_REMBG_MODEL`, default `u2net`). Returns an RGBA PNG, or `503`
+  with a clear message if rembg/onnxruntime aren't installed (the frontend
+  degrades gracefully). rembg is heavy and commented out of `requirements.txt`;
+  install it on the GPU box with `onnxruntime-gpu` and pre-warm on startup.
 - **export-pdf:** done — Pillow + img2pdf, exact physical page size (MediaBox),
   TrimBox inset by bleed, RGB embedded losslessly. `cmyk:true` converts via
   `ImageCms` + the `CF_CMYK_ICC` profile when set, else a naive Pillow
@@ -33,7 +35,8 @@ curl -s http://127.0.0.1:5004/api/health
   `X-Dim-Match` flags whether the upload matched `round(in*300)`. PDF/X-1a via
   Ghostscript remains optional — see `docs/DEPLOYMENT.md`.
 - **Config via env:** `CF_PORT`, `CF_ALLOWED_ORIGIN`, `CF_MAX_UPLOAD_MB`,
-  `CF_CMYK_ICC` (path to a CMYK ICC profile). Never hardcode origins or secrets.
+  `CF_CMYK_ICC` (path to a CMYK ICC profile), `CF_REMBG_MODEL` (rembg model
+  name). Never hardcode origins or secrets.
 
 ## Prod
 

@@ -37,6 +37,19 @@ def health():
     return jsonify(status="ok", service="cover-forge-api", version="0.1.0")
 
 
+_REMBG_SESSION = None  # cached model session (loaded once, lazily)
+
+
+def _rembg_session():
+    """Load the rembg model session once and reuse it. CF_REMBG_MODEL selects
+    the model (default u2net; u2netp is smaller, isnet-general-use is sharper)."""
+    global _REMBG_SESSION
+    if _REMBG_SESSION is None:
+        from rembg import new_session  # heavy import — lazy
+        _REMBG_SESSION = new_session(os.environ.get("CF_REMBG_MODEL", "u2net"))
+    return _REMBG_SESSION
+
+
 @app.post("/api/remove-bg")
 def remove_bg():
     """
@@ -44,20 +57,28 @@ def remove_bg():
             JSON {"image_base64": "<data without data: prefix>"}.
     Output: image/png (RGBA) with the background removed.
 
-    TODO: implement with rembg (simplest) or a BiRefNet ONNX session on the
-    local GPU box. Keep the model load module-level + lazy so repeated calls
-    don't reload it. Example with rembg:
-
-        from rembg import remove          # lazy import inside the function
-        out = remove(input_bytes)         # returns PNG bytes (RGBA)
+    Uses rembg (lazy import + cached session). rembg/onnxruntime are heavy and
+    intended for the GPU box (see docs/DEPLOYMENT.md); if they aren't installed
+    the endpoint returns 503 with a clear message so the frontend can degrade.
     """
     data = _read_image_bytes(request)
     if data is None:
         return jsonify(error="no image provided (field 'image' or 'image_base64')"), 400
 
-    # --- STUB: echo the input back unchanged so the frontend can be wired. ---
-    # Replace this whole block with the real rembg/BiRefNet call.
-    return send_file(io.BytesIO(data), mimetype="image/png", download_name="cutout.png")
+    try:
+        from rembg import remove  # lazy import
+    except Exception:
+        return jsonify(
+            error="background removal is not available on this server",
+            detail="install rembg + onnxruntime (run on the GPU box) — see docs/DEPLOYMENT.md",
+        ), 503
+
+    try:
+        out = remove(data, session=_rembg_session())  # PNG bytes (RGBA)
+    except Exception as e:  # model/runtime failure
+        return jsonify(error="background removal failed", detail=str(e)), 500
+
+    return send_file(io.BytesIO(out), mimetype="image/png", download_name="cutout.png")
 
 
 @app.post("/api/export-pdf")

@@ -131,6 +131,13 @@ export function cmykRisk(hex) {
   return s >= CMYK_SAT_RISK && v >= CMYK_VAL_RISK;
 }
 
+// Snap a value to the nearest target within tolerance (else return it unchanged).
+// Used for drag-positioning blocks onto the safe-area guides. Pure.
+export function snap(value, targets, tol) {
+  for (const t of targets) if (Math.abs(value - t) <= tol) return t;
+  return value;
+}
+
 /* ---------- gradient geometry (pure) ---------- */
 // Endpoints for a linear gradient that spans a w*h box at angleDeg, measured
 // from the x-axis: 0 = left->right, 90 = top->bottom. The line is extended so

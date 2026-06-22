@@ -5,10 +5,10 @@
 
 import { S } from "./state.js";
 import {
-  dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED,
+  dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
 } from "./kdp.js";
-import { render, drawCover, getPrevScale, rotateBy } from "./render.js";
+import { render, drawCover, getPrevScale, rotateBy, frontHitTest, getHitBox } from "./render.js";
 import { exportWrap, exportEbook, exportPDF } from "./export.js";
 import { ensureFontsLoaded } from "./fonts.js";
 
@@ -281,15 +281,57 @@ $("expPdf").onclick = async () => {
 $("scale").addEventListener("input", (e) => { S.imgScale = +e.target.value / 100; $("scaleL").textContent = e.target.value + "%"; rerender(); });
 $("imgReset").onclick = () => { S.imgScale = 1; S.imgX = 0; S.imgY = 0; $("scale").value = 100; $("scaleL").textContent = "100%"; rerender(); };
 
+// Canvas interactions: dragging a selected front block takes priority; empty
+// space pans the background image. Block positions snap to the safe-area guides.
 let imgDrag = false, ix, iy;
-cv.addEventListener("pointerdown", (e) => { if (!S.img) return; imgDrag = true; ix = e.clientX; iy = e.clientY; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+let blockDrag = null; // { kind, offX, offY } in canvas px
+
+const canvasPt = (e) => {
+  const r = cv.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (cv.width / r.width), y: (e.clientY - r.top) * (cv.height / r.height) };
+};
+const capture = (id) => { try { cv.setPointerCapture(id); } catch (_) { /* inactive pointer */ } };
+
+function dragBlock(e) {
+  const p = canvasPt(e), o = S[blockDrag.kind], d = dims(S), scale = getPrevScale();
+  const H = d.fullH * scale, x0 = d.frontX * scale, w = S.trimW * scale;
+  const ax = p.x + blockDrag.offX, ay = p.y + blockDrag.offY; // block center
+  const tol = 10; // px snap radius
+  const topP = (BLEED + SAFE) / d.fullH * 100, botP = (d.fullH - BLEED - SAFE) / d.fullH * 100;
+  o.x = clamp(snap((ax - x0) / w, [0.5], tol / w), 0, 1);
+  o.y = clamp(snap(ay / H * 100, [topP, 50, botP], tol / H * 100), 0, 100);
+  const yEl = blockDrag.kind === "title" ? "tY" : "aY", yLab = blockDrag.kind === "title" ? "tYL" : "aYL";
+  $(yEl).value = clamp(Math.round(o.y), +$(yEl).min, +$(yEl).max);
+  $(yLab).textContent = Math.round(o.y) + "%";
+  rerender();
+}
+
+cv.addEventListener("pointerdown", (e) => {
+  const p = canvasPt(e);
+  if (S.view === "2d") {
+    const kind = frontHitTest(p.x, p.y);
+    if (kind) {
+      const hb = getHitBox(kind);
+      blockDrag = { kind, offX: (hb.x + hb.w / 2) - p.x, offY: (hb.y + hb.h / 2) - p.y };
+      S.selected = kind; capture(e.pointerId); cv.style.cursor = "grabbing"; rerender(); return;
+    }
+  }
+  if (S.selected) { S.selected = null; rerender(); }
+  if (!S.img) return;
+  imgDrag = true; ix = e.clientX; iy = e.clientY; capture(e.pointerId); cv.style.cursor = "grabbing";
+});
 cv.addEventListener("pointermove", (e) => {
-  if (!imgDrag) return; const r = cv.getBoundingClientRect();
+  if (blockDrag) { dragBlock(e); return; }
+  if (!imgDrag) {
+    cv.style.cursor = (S.view === "2d" && frontHitTest(canvasPt(e).x, canvasPt(e).y)) ? "move" : (S.img ? "grab" : "default");
+    return;
+  }
+  const r = cv.getBoundingClientRect();
   S.imgX += (e.clientX - ix) * (cv.width / r.width) / getPrevScale();
   S.imgY += (e.clientY - iy) * (cv.height / r.height) / getPrevScale();
   ix = e.clientX; iy = e.clientY; rerender();
 });
-cv.addEventListener("pointerup", () => { imgDrag = false; cv.style.cursor = S.img ? "grab" : "default"; });
+cv.addEventListener("pointerup", () => { blockDrag = null; imgDrag = false; cv.style.cursor = S.img ? "grab" : "default"; });
 cv.addEventListener("wheel", (e) => {
   if (!S.img) return; e.preventDefault();
   const r = cv.getBoundingClientRect();

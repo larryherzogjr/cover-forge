@@ -10,7 +10,7 @@ import {
   DPI_MIN, DPI_FLOOR,
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
   imageRegion, effectiveDPI, dpiSeverity,
-  hexToRgb, rgbToHsv, cmykRisk, gradientLine,
+  hexToRgb, rgbToHsv, cmykRisk, gradientLine, snap,
 } from "../src/kdp.js";
 
 const near = (a, b, eps = 1e-9) =>
@@ -142,6 +142,14 @@ test("rgbToHsv basics", () => {
   near(red.s, 1); near(red.v, 1);
   const white = rgbToHsv("#ffffff");
   near(white.s, 0); near(white.v, 1);
+});
+
+test("snap pulls to the nearest target within tolerance", () => {
+  assert.equal(snap(0.52, [0.5], 0.05), 0.5);   // within tol -> snaps
+  assert.equal(snap(0.6, [0.5], 0.05), 0.6);    // outside tol -> unchanged
+  assert.equal(snap(49, [4, 50, 96], 2), 50);   // nearest target wins
+  assert.equal(snap(4.05, [4, 50, 96], 2), 4);
+  assert.equal(snap(75, [4, 50, 96], 2), 75);   // none in range
 });
 
 test("gradientLine spans the box at 0/90/45 degrees", () => {

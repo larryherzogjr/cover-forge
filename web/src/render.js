@@ -17,6 +17,21 @@ const cx = cv.getContext("2d");
 let PREV_SCALE = 1;                 // px-per-inch of the current preview
 export const getPrevScale = () => PREV_SCALE;
 
+// Draggable front blocks. Bounding boxes (preview-scale px) are recorded during
+// the live render so ui.js can hit-test pointer events against them.
+export const FRONT_BLOCKS = ["title", "author"];
+const hitBoxes = {};
+export const getHitBox = (kind) => hitBoxes[kind];
+export function frontHitTest(px, py) {
+  // topmost-first: author sits over title only if overlapping; check both, prefer
+  // the smaller/last-drawn. Simple containment is enough for two blocks.
+  for (const kind of FRONT_BLOCKS) {
+    const b = hitBoxes[kind];
+    if (b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return kind;
+  }
+  return null;
+}
+
 // Base fill (solid or linear gradient) for any W*H px region. Shared by the
 // wrap render and the ebook export so they stay consistent.
 export function fillBackground(ctx, W, H) {
@@ -32,10 +47,11 @@ export function fillBackground(ctx, W, H) {
 }
 
 /* ---------- drawing core (resolution-independent via px scale) ---------- */
-export function drawCover(ctx, scale, showGuides) {
+export function drawCover(ctx, scale, showGuides, recordHits) {
   const d = dims(S);
   const W = d.fullW * scale, H = d.fullH * scale;
   ctx.clearRect(0, 0, W, H);
+  if (recordHits) for (const k in hitBoxes) delete hitBoxes[k]; // stale-proof per render
 
   // base fill — solid or linear gradient
   fillBackground(ctx, W, H);
@@ -58,9 +74,9 @@ export function drawCover(ctx, scale, showGuides) {
   // ---- BACK COVER VERBIAGE (flows around barcode zone) ----
   drawBackText(ctx, scale);
   // ---- TITLE (front cover) ----
-  drawWrapText(ctx, S.title, front, scale, "title");
+  drawWrapText(ctx, S.title, front, scale, "title", recordHits);
   // ---- AUTHOR ----
-  drawWrapText(ctx, S.author, front, scale, "author");
+  drawWrapText(ctx, S.author, front, scale, "author", recordHits);
 
   // ---- SPINE TEXT ----
   if (S.spine.text && spineTextAllowed(S.pages)) {
@@ -76,7 +92,7 @@ export function drawCover(ctx, scale, showGuides) {
   if (showGuides) drawGuides(ctx, d, scale, W, H);
 }
 
-export function drawWrapText(ctx, o, box, scale, kind) {
+export function drawWrapText(ctx, o, box, scale, kind, recordHits) {
   if (!o.text.trim()) return;
   ctx.save();
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -84,11 +100,15 @@ export function drawWrapText(ctx, o, box, scale, kind) {
   ctx.font = (kind === "title" ? "700 " : "600 ") + px + "px '" + o.font + "'";
   if (o.letterSpacing) ctx.letterSpacing = fontPx(o.letterSpacing, scale) + "px"; // pt -> px
   const text = o.caps ? o.text.toUpperCase() : o.text;
-  const cx2 = box.x + box.w / 2;
+  const cx2 = box.x + box.w * (o.x != null ? o.x : 0.5);  // horizontal center
   const cy = box.h * (o.y / 100);
   const lines = wrapLines(ctx, text, box.w * 0.84);
   const lh = px * (o.lineHeight || 1.12);
   const strokePx = o.stroke && o.stroke.width ? fontPx(o.stroke.width, scale) : 0;
+  if (recordHits) {
+    const maxW = Math.max(1, ...lines.map((l) => ctx.measureText(l).width));
+    hitBoxes[kind] = { x: cx2 - maxW / 2, y: cy - lines.length * lh / 2, w: maxW, h: lines.length * lh };
+  }
   let y = cy - (lines.length - 1) * lh / 2;
   for (const ln of lines) {
     if (o.shadow) {
@@ -227,8 +247,20 @@ export function render() {
   PREV_SCALE = scale;
   const W = Math.round(d.fullW * scale), H = Math.round(d.fullH * scale);
   cv.width = W; cv.height = H;
-  drawCover(cx, scale, S.guides);
+  drawCover(cx, scale, S.guides, true);
+  drawSelection();
   if (S.view === "3d") build3D();
+}
+
+// Dashed brass outline around the selected draggable block (preview only).
+function drawSelection() {
+  const b = S.selected && hitBoxes[S.selected];
+  if (!b) return;
+  const pad = 6;
+  cx.save();
+  cx.strokeStyle = "#e3c982"; cx.lineWidth = 1.5; cx.setLineDash([6, 4]);
+  cx.strokeRect(b.x - pad, b.y - pad, b.w + 2 * pad, b.h + 2 * pad);
+  cx.restore();
 }
 
 /* ---------- 3D ---------- */

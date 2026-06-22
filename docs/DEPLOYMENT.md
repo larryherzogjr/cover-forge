@@ -19,6 +19,56 @@ service. Background removal should run where the GPU is.
   5005 — 5004 is free). Bind to 127.0.0.1; nginx proxies it.
 - Frontend: served by nginx (80/443) on its own vhost or a subpath.
 
+## Split layout: frontend VM + API on the inference (GPU) box
+
+This is the recommended layout when background removal runs on a separate
+machine (rembg/onnxruntime are heavy and want the GPU). The browser still talks
+to **one origin** (the VM), so there's no CORS:
+
+```
+browser ──> Proxmox VM : nginx ──serves──> web/ (static)
+                              └─proxy /api/─> inference box : gunicorn :5004 (Flask + rembg)
+```
+
+**On the inference box (API):**
+
+```bash
+sudo mkdir -p /opt/cover-forge && cd /opt/cover-forge
+# copy the repo's server/ here (git clone, scp, or rsync), then:
+cd server && python3 -m venv ../.venv && . ../.venv/bin/activate
+pip install -r requirements.txt
+pip install rembg onnxruntime          # or onnxruntime-gpu if CUDA is set up
+```
+
+- In `deploy/cover-forge-api.service`, switch `ExecStart` to the `0.0.0.0:5004`
+  bind (commented in the file) so the VM can reach it, then install + start it
+  (see "API service" below).
+- **Firewall** port 5004 to just the VM, e.g.:
+  `sudo ufw allow from <VM-IP> to any port 5004 proto tcp` (don't leave it open
+  to the whole LAN).
+- Pre-warm the model after start so the first real request isn't slow:
+  `curl -s -o /dev/null -F image=@/path/to/any.png http://127.0.0.1:5004/api/remove-bg`
+  (the first call downloads the model to `~/.u2net/`).
+
+**On the Proxmox VM (frontend + proxy):**
+
+```bash
+sudo apt install nginx
+sudo mkdir -p /opt/cover-forge && # copy the repo's web/ to /opt/cover-forge/web
+```
+
+- Use `deploy/nginx-cover-forge.conf`, but set `proxy_pass http://<inference-box-IP>:5004;`
+  in the `/api/` block (commented note in the file). nginx serves `web/`
+  statically and proxies `/api/` across to the inference box.
+- No CORS config is needed (the browser only ever sees the VM origin); leave
+  `CF_ALLOWED_ORIGIN` at the site origin or `*` since `/api` is reached server-
+  to-server.
+
+If you'd rather not run nginx at all, the simplest single-box option is to serve
+everything from the inference box's Flask process (it already runs there) — but
+that needs Flask to serve `web/` statically, which the API doesn't do yet; the
+nginx front door above is the supported path.
+
 ## API service (systemd + gunicorn)
 
 ```bash

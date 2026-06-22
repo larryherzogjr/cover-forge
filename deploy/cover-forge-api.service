@@ -9,10 +9,21 @@ User=www-data
 Group=www-data
 WorkingDirectory=/opt/cover-forge/server
 Environment=CF_PORT=5004
-# Set this to the real frontend origin in production (NOT * ):
+# Only matters if the browser ever calls the API directly (cross-origin). With
+# nginx proxying /api on the SAME origin as the frontend, requests are server-to-
+# server and CORS never applies, so this can stay as the site origin (or *).
 Environment=CF_ALLOWED_ORIGIN=https://coverforge.example.lan
 Environment=CF_MAX_UPLOAD_MB=25
+# Background removal model (only used once rembg + onnxruntime are installed):
+Environment=CF_REMBG_MODEL=u2net
+# Optional accurate CMYK PDFs — point at a CMYK ICC profile if you have one:
+# Environment=CF_CMYK_ICC=/opt/cover-forge/profiles/USWebCoatedSWOP.icc
+
+# Same-box (nginx + API together): bind localhost.
 ExecStart=/opt/cover-forge/.venv/bin/gunicorn -w 2 -b 127.0.0.1:5004 --timeout 120 app:app
+# Split layout (API on the inference box, nginx on another host): bind the LAN
+# interface instead so the proxy can reach it, and firewall :5004 to that host.
+# ExecStart=/opt/cover-forge/.venv/bin/gunicorn -w 2 -b 0.0.0.0:5004 --timeout 120 app:app
 Restart=on-failure
 RestartSec=3
 

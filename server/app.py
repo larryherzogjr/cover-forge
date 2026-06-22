@@ -14,7 +14,7 @@ import base64
 import io
 import os
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -30,6 +30,13 @@ MAX_UPLOAD_MB = int(os.environ.get("CF_MAX_UPLOAD_MB", "25"))
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 DPI = 300  # KDP print resolution; must match the frontend render (docs/KDP_SPEC.md)
+
+# Optionally serve the static frontend from this same process, so the whole app
+# runs on one port/origin with no separate web server (set CF_WEB_DIR to override,
+# or to "" to disable and run API-only behind nginx). See docs/DEPLOYMENT.md.
+_default_web = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
+WEB_DIR = os.path.abspath(os.environ.get("CF_WEB_DIR", _default_web))
+SERVE_WEB = bool(WEB_DIR) and os.path.isdir(WEB_DIR)
 
 
 @app.get("/api/health")
@@ -191,5 +198,21 @@ def _read_image_bytes(req):
     return None
 
 
+# --- static frontend (single-origin deploy: this process serves web/ too) ---
+if SERVE_WEB:
+    @app.get("/")
+    def _index():
+        return send_from_directory(WEB_DIR, "index.html")
+
+    @app.get("/<path:path>")
+    def _static(path):
+        # never let the catch-all shadow the API (explicit /api rules match first,
+        # but guard unknown /api/* so it 404s instead of probing the filesystem)
+        if path == "api" or path.startswith("api/"):
+            abort(404)
+        return send_from_directory(WEB_DIR, path)
+
+
 if __name__ == "__main__":
-    app.run(port=int(os.environ.get("CF_PORT", "5004")), debug=True)
+    app.run(host=os.environ.get("CF_HOST", "127.0.0.1"),
+            port=int(os.environ.get("CF_PORT", "5004")), debug=True)

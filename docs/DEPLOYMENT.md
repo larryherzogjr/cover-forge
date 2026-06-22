@@ -19,6 +19,31 @@ service. Background removal should run where the GPU is.
   5005 — 5004 is free). Bind to 127.0.0.1; nginx proxies it.
 - Frontend: served by nginx (80/443) on its own vhost or a subpath.
 
+## Single-process (no nginx) — serve everything from Flask
+
+Simplest option, and the one to use when the box already runs apps on direct
+ports (e.g. llama.cpp on :3000). One gunicorn process serves the static `web/`
+**and** `/api/*` on a single LAN port — same origin, no CORS, no nginx. The Flask
+app auto-serves `web/` whenever it finds it next to `server/` (override/disable
+with `CF_WEB_DIR`).
+
+```bash
+sudo mkdir -p /opt/cover-forge && sudo chown "$USER" /opt/cover-forge
+gh repo clone <owner>/cover-forge /opt/cover-forge
+cd /opt/cover-forge/server
+python3 -m venv ../.venv && . ../.venv/bin/activate
+pip install -r requirements.txt
+pip install "rembg[gpu]"          # background removal; or onnxruntime (CPU), or skip
+# serve on the LAN like llama.cpp:
+../.venv/bin/gunicorn -w 2 -b 0.0.0.0:5004 --timeout 120 app:app
+```
+
+Open `http://<box>:5004/`. The frontend resolves its API calls to the same
+origin automatically (any port except 8080). For a service, use
+`deploy/cover-forge-api.service` with the `0.0.0.0:5004` `ExecStart` (commented in
+the file). Bound to `0.0.0.0` it's reachable on the LAN (like llama.cpp on
+:3000); add a `ufw` rule if you want to restrict who can reach it.
+
 ## Split layout: frontend VM + API on the inference (GPU) box
 
 This is the recommended layout when background removal runs on a separate

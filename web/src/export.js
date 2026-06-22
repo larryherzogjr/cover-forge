@@ -5,6 +5,14 @@
 import { S } from "./state.js";
 import { dims, DPI, BLEED } from "./kdp.js";
 import { drawCover, drawImageFit, drawWrapText, fillBackground } from "./render.js";
+import { loadFonts } from "./fonts.js";
+
+// Every family the design renders with (spine uses Cormorant Garamond). Exports
+// await these so a freshly-picked font can't rasterize as a fallback.
+const usedFonts = () => [
+  S.title.font, S.author.font, S.subtitle.font, S.series.font, S.pullquote.font,
+  S.back.font, "Cormorant Garamond",
+];
 
 // API origin for the server-only features (PDF, bg-removal). In dev the static
 // site is on :8080 and Flask on :5004; in prod nginx proxies same-origin /api.
@@ -13,7 +21,8 @@ const API_BASE = (typeof window !== "undefined" && window.CF_API_BASE) ||
   (typeof location !== "undefined" && location.port === "8080" ? "http://127.0.0.1:5004" : "");
 
 // Print wrap: exact KDP pixel dimensions, no guide overlay.
-export function exportWrap() {
+export async function exportWrap() {
+  await loadFonts(usedFonts());
   const d = dims(S);
   const c = document.createElement("canvas"); c.width = d.pxW; c.height = d.pxH;
   drawCover(c.getContext("2d"), DPI, false);
@@ -21,7 +30,8 @@ export function exportWrap() {
 }
 
 // Ebook front cover at the common 1600x2560 storefront size.
-export function exportEbook() {
+export async function exportEbook() {
+  await loadFonts(usedFonts());
   const W = 1600, H = 2560; const c = document.createElement("canvas"); c.width = W; c.height = H;
   const ctx = c.getContext("2d");
   fillBackground(ctx, W, H);
@@ -73,6 +83,7 @@ function dlBlob(blob, name) {
 // on failure so the caller can degrade gracefully (the PNG export still works
 // fully offline). Returns { cmykMode } from the response for a user notice.
 export async function exportPDF({ cmyk = false } = {}) {
+  await loadFonts(usedFonts());
   const d = dims(S);
   const c = document.createElement("canvas"); c.width = d.pxW; c.height = d.pxH;
   drawCover(c.getContext("2d"), DPI, false);

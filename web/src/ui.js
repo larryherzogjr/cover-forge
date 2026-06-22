@@ -10,7 +10,7 @@ import {
 } from "./kdp.js";
 import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
-import { ensureFontsLoaded } from "./fonts.js";
+import { ensureFontsLoaded, loadFonts } from "./fonts.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -22,6 +22,8 @@ function rerender() {
   updateNotices();
   autosave();
 }
+// Re-render now (fallback type), then again once the newly-picked face loads.
+const loadFontThenRender = (fam) => { loadFonts([fam]).then(rerender); };
 
 /* ---------- autosave to localStorage (restores on reload) ---------- */
 let booted = false;        // gate autosave until any boot-restore finishes
@@ -151,7 +153,7 @@ function bindColor(id, labelId, obj, key) {
 function bindTextBlock(prefix, blockKey) {
   const o = S[blockKey];
   $(prefix + "Text").addEventListener("input", (e) => { o.text = e.target.value; rerender(); });
-  $(prefix + "Font").addEventListener("change", (e) => { o.font = e.target.value; rerender(); });
+  $(prefix + "Font").addEventListener("change", (e) => { o.font = e.target.value; rerender(); loadFontThenRender(e.target.value); });
   bindSlider(prefix + "Size", prefix + "SizeL", o, "size", (v) => v + " pt");
   bindColor(prefix + "Color", prefix + "ColorL", o, "color");
   $(prefix + "Caps").addEventListener("change", (e) => { o.caps = e.target.checked; rerender(); });
@@ -170,7 +172,7 @@ $("paper").addEventListener("change", (e) => { S.paper = +e.target.value; update
 
 /* ---------- title ---------- */
 $("tTitle").addEventListener("input", (e) => { S.title.text = e.target.value; rerender(); });
-$("tFont").addEventListener("change", (e) => { S.title.font = e.target.value; rerender(); });
+$("tFont").addEventListener("change", (e) => { S.title.font = e.target.value; rerender(); loadFontThenRender(e.target.value); });
 bindSlider("tSize", "tSizeL", S.title, "size", (v) => v + " pt");
 bindSlider("tY", "tYL", S.title, "y", (v) => v + "%");
 bindColor("tColor", "tColorL", S.title, "color");
@@ -189,7 +191,7 @@ $("tShOp").addEventListener("input", (e) => { S.title.shadowOpacity = +e.target.
 
 /* ---------- author ---------- */
 $("aText").addEventListener("input", (e) => { S.author.text = e.target.value; rerender(); });
-$("aFont").addEventListener("change", (e) => { S.author.font = e.target.value; rerender(); });
+$("aFont").addEventListener("change", (e) => { S.author.font = e.target.value; rerender(); loadFontThenRender(e.target.value); });
 bindSlider("aSize", "aSizeL", S.author, "size", (v) => v + " pt");
 bindSlider("aY", "aYL", S.author, "y", (v) => v + "%");
 bindColor("aColor", "aColorL", S.author, "color");
@@ -229,7 +231,7 @@ $("imgBlend").addEventListener("change", (e) => { S.imgBlend = e.target.value; r
 /* ---------- back cover ---------- */
 $("bText").value = S.back.text;
 $("bText").addEventListener("input", (e) => { S.back.text = e.target.value; rerender(); });
-$("bFont").addEventListener("change", (e) => { S.back.font = e.target.value; rerender(); });
+$("bFont").addEventListener("change", (e) => { S.back.font = e.target.value; rerender(); loadFontThenRender(e.target.value); });
 bindSlider("bSize", "bSizeL", S.back, "size", (v) => v + " pt");
 bindSlider("bY", "bYL", S.back, "y", (v) => v + "%");
 bindSlider("bLh", "bLhL", S.back, "lineHeight");
@@ -262,7 +264,7 @@ $("applyGenre").onclick = () => {
   S.author.font = g.aFont; $("aFont").value = g.aFont;
   S.title.color = g.tColor; $("tColor").value = g.tColor; $("tColorL").textContent = g.tColor;
   S.author.color = g.aColor; $("aColor").value = g.aColor; $("aColorL").textContent = g.aColor;
-  rerender();
+  rerender(); loadFonts([g.tFont, g.aFont]).then(rerender);
 };
 
 /* ---------- file upload ---------- */

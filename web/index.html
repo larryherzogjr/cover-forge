@@ -205,6 +205,11 @@
     <div class="grp">
       <p class="eyebrow">Book spec</p>
 
+      <div class="seg" id="bindingSeg" style="margin-bottom:13px">
+        <button class="on" data-binding="paperback">Paperback</button>
+        <button data-binding="hardcover">Hardcover</button>
+      </div>
+
       <label class="fld">
         <span>Trim size</span>
         <select id="trim">
@@ -236,6 +241,12 @@
           </select>
         </label>
       </div>
+
+      <div id="hcWrap" style="display:none">
+        <label class="fld"><span>Spine width (from KDP calculator) <b id="spineOverL" class="mono"></b></span>
+          <input type="number" id="spineOver" step="0.001" min="0" placeholder="auto-estimate"></label>
+        <div class="notice warn show" style="margin-top:0">Hardcover: the wrap (0.51″), safe (0.635″), hinge (0.4″) and barcode are KDP's published numbers, but the <b>spine width is an estimate</b> — paste the exact value from KDP's cover calculator and order a proof before printing.</div>
+      </div>
     </div>
 
     <div class="grp">
@@ -244,8 +255,8 @@
         <div class="line hero"><span class="k">Spine width</span><span class="v" id="oSpine">—</span></div>
         <div class="line"><span class="k">Full cover</span><span class="v" id="oFull">—</span></div>
         <div class="line"><span class="k">Pixels @300</span><span class="v" id="oPx">—</span></div>
-        <div class="line"><span class="k">Bleed (each edge)</span><span class="v">0.125 <small>in</small></span></div>
-        <div class="line"><span class="k">Safe margin</span><span class="v">0.25 <small>in</small></span></div>
+        <div class="line"><span class="k" id="oEdgeK">Bleed (each edge)</span><span class="v"><span id="oEdge">0.125</span> <small>in</small></span></div>
+        <div class="line"><span class="k">Safe margin</span><span class="v"><span id="oSafe">0.25</span> <small>in</small></span></div>
         <div class="line"><span class="k">Spine text</span><span class="v" id="oSpineText">—</span></div>
       </div>
       <div class="warn" id="spineWarn"></div>

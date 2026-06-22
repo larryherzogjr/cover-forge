@@ -5,7 +5,7 @@
 // preview and the 300-DPI export produce an identical crop.
 
 import { S } from "./state.js";
-import { dims, safeArea, barcodeBox, spineTextAllowed, fontPx, gradientLine, hexToRgb, DPI, BLEED, SAFE } from "./kdp.js";
+import { dims, safeArea, barcodeBox, spineTextAllowed, fontPx, gradientLine, hexToRgb, HC_HINGE, DPI } from "./kdp.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -67,7 +67,7 @@ export function drawCover(ctx, scale, showGuides, recordHits) {
     ctx.globalCompositeOperation = S.imgBlend || "source-over";
     const px = S.imgX * scale, py = S.imgY * scale;
     if (S.fit === "front") {
-      drawImageFit(ctx, S.img, d.frontX * scale, 0, (S.trimW + BLEED) * scale, H, S.imgScale, px, py);
+      drawImageFit(ctx, S.img, d.frontX * scale, 0, (S.trimW + d.edge) * scale, H, S.imgScale, px, py);
     } else {
       drawImageFit(ctx, S.img, 0, 0, W, H, S.imgScale, px, py);
     }
@@ -225,15 +225,20 @@ export function drawImageFit(ctx, img, rx, ry, rw, rh, zoom, panXpx, panYpx) {
 
 function drawGuides(ctx, d, scale, W, H) {
   const I = (v) => v * scale;
-  // bleed (outer) — red dashed
-  line(ctx, I(BLEED), 0, I(BLEED), H, "#ff5a5a", 1, [6, 5]);
-  line(ctx, W - I(BLEED), 0, W - I(BLEED), H, "#ff5a5a", 1, [6, 5]);
-  line(ctx, 0, I(BLEED), W, I(BLEED), "#ff5a5a", 1, [6, 5]);
-  line(ctx, 0, H - I(BLEED), W, H - I(BLEED), "#ff5a5a", 1, [6, 5]);
+  // bleed / wrap (outer) — red dashed (0.125" paperback, 0.51" hardcover turn-in)
+  line(ctx, I(d.edge), 0, I(d.edge), H, "#ff5a5a", 1, [6, 5]);
+  line(ctx, W - I(d.edge), 0, W - I(d.edge), H, "#ff5a5a", 1, [6, 5]);
+  line(ctx, 0, I(d.edge), W, I(d.edge), "#ff5a5a", 1, [6, 5]);
+  line(ctx, 0, H - I(d.edge), W, H - I(d.edge), "#ff5a5a", 1, [6, 5]);
   // spine fold lines — cyan
   line(ctx, I(d.spineX), 0, I(d.spineX), H, "#39d4ff", 1.3, []);
   line(ctx, I(d.frontX), 0, I(d.frontX), H, "#39d4ff", 1.3, []);
-  // safe margin — green dashed: 0.25" inside the trim on all four sides
+  // hardcover hinge keep-clear — orange dashed, 0.4" each side of the spine
+  if (d.hc) {
+    line(ctx, I(d.spineX - HC_HINGE), 0, I(d.spineX - HC_HINGE), H, "#f0a830", 1, [3, 4]);
+    line(ctx, I(d.frontX + HC_HINGE), 0, I(d.frontX + HC_HINGE), H, "#f0a830", 1, [3, 4]);
+  }
+  // safe margin — green dashed (outer 0.25"/0.635"; spine side 0.25"/0.4" hinge)
   const back = safeArea(d, "back"), frontSafe = safeArea(d, "front");
   rectStroke(ctx, back.x * scale, back.y * scale, back.w * scale, back.h * scale, "#54e08a", [5, 5]);
   rectStroke(ctx, frontSafe.x * scale, frontSafe.y * scale, frontSafe.w * scale, frontSafe.h * scale, "#54e08a", [5, 5]);
@@ -246,7 +251,7 @@ function drawGuides(ctx, d, scale, W, H) {
   ctx.fillText("ISBN / barcode", bx + 6, by + 15); ctx.fillText("keep clear", bx + 6, by + 28);
   // labels
   ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.font = "11px 'Space Mono'"; ctx.textAlign = "center";
-  ctx.fillText("BACK", I(BLEED) + I(S.trimW) / 2, 22);
+  ctx.fillText("BACK", I(d.edge) + I(S.trimW) / 2, 22);
   ctx.fillText("SPINE", I(d.spineX) + I(d.spine) / 2, H - 14);
   ctx.fillText("FRONT", I(d.frontX) + I(S.trimW) / 2, 22);
 }
@@ -290,8 +295,8 @@ function faceCanvas(part) {
   const d = dims(S); const sc = 300 / d.fullH; // px per inch for 3D textures
   const c = document.createElement("canvas");
   let region;
-  if (part === "front") region = [d.frontX, 0, S.trimW + BLEED, d.fullH];
-  else if (part === "back") region = [0, 0, S.trimW + BLEED, d.fullH];
+  if (part === "front") region = [d.frontX, 0, S.trimW + d.edge, d.fullH];
+  else if (part === "back") region = [0, 0, S.trimW + d.edge, d.fullH];
   else region = [d.spineX, 0, d.spine, d.fullH];
   c.width = Math.max(2, Math.round(region[2] * sc)); c.height = Math.round(region[3] * sc);
   const fctx = c.getContext("2d");
@@ -308,8 +313,8 @@ function build3D() {
   const d = dims(S);
   const book = $("book");
   const faceH = 300;
-  const faceW = (S.trimW) / (S.trimH + BLEED * 2) * faceH;
-  const spineW = Math.max(6, (d.spine) / (S.trimH + BLEED * 2) * faceH);
+  const faceW = (S.trimW) / d.fullH * faceH;
+  const spineW = Math.max(6, (d.spine) / d.fullH * faceH);
   book.style.width = faceW + "px"; book.style.height = faceH + "px";
   book.innerHTML = "";
   const mk = (cls, img, w, tf, extra) => {

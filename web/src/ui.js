@@ -7,6 +7,7 @@ import { S, serialize, restore, AUTOSAVE_KEY } from "./state.js";
 import {
   dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
+  HC_PAGE_MIN, HC_PAGE_MAX,
 } from "./kdp.js";
 import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
@@ -147,6 +148,9 @@ function updateReadout() {
   $("oSpine").innerHTML = d.spine.toFixed(4) + ' <small>in</small>';
   $("oFull").innerHTML = d.fullW.toFixed(3) + ' × ' + d.fullH.toFixed(3) + ' <small>in</small>';
   $("oPx").textContent = d.pxW + ' × ' + d.pxH;
+  $("oEdge").textContent = d.edge;
+  $("oSafe").textContent = d.safe;
+  $("oEdgeK").textContent = d.hc ? "Wrap (turn-in)" : "Bleed (each edge)";
   const ok = spineTextAllowed(S.pages);
   $("oSpineText").innerHTML = ok
     ? '<span style="color:var(--ok)">allowed</span>'
@@ -228,6 +232,27 @@ $("cw").addEventListener("input", (e) => { S.trimW = +e.target.value; updateRead
 $("ch").addEventListener("input", (e) => { S.trimH = +e.target.value; updateReadout(); rerender(); });
 $("pages").addEventListener("input", (e) => { S.pages = +e.target.value || 24; updateReadout(); rerender(); });
 $("paper").addEventListener("change", (e) => { S.paper = +e.target.value; updateReadout(); rerender(); });
+
+// binding: paperback <-> hardcover (swaps geometry, page range, spine field)
+function applyBindingUI() {
+  const hc = S.binding === "hardcover";
+  $("hcWrap").style.display = hc ? "block" : "none";
+  const pg = $("pages");
+  pg.min = hc ? HC_PAGE_MIN : 24; pg.max = hc ? HC_PAGE_MAX : 828;
+  if (hc) S.pages = clamp(S.pages, HC_PAGE_MIN, HC_PAGE_MAX);
+  else { S.spineOverride = null; $("spineOver").value = ""; } // spine override is hardcover-only
+  pg.value = S.pages;
+}
+document.querySelectorAll("#bindingSeg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#bindingSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
+  S.binding = b.dataset.binding;
+  applyBindingUI(); updateReadout(); rerender();
+}));
+$("spineOver").addEventListener("input", (e) => {
+  const v = parseFloat(e.target.value);
+  S.spineOverride = (v > 0) ? v : null;
+  updateReadout(); rerender();
+});
 
 /* ---------- title ---------- */
 $("tTitle").addEventListener("input", (e) => { S.title.text = e.target.value; rerender(); });
@@ -556,6 +581,9 @@ function syncUI() {
   $("customWrap").style.display = hasOpt ? "none" : "flex";
   sv("cw", S.trimW); sv("ch", S.trimH);
   sv("pages", S.pages); sv("paper", String(S.paper));
+  sseg("#bindingSeg", "binding", S.binding);
+  sv("spineOver", S.spineOverride != null ? S.spineOverride : "");
+  applyBindingUI();
 
   sseg("#bgModeSeg", "bg", S.bgMode);
   $("solidWrap").style.display = S.bgMode === "solid" ? "block" : "none";

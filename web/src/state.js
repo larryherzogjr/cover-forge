@@ -16,6 +16,8 @@ const titleStyle = {
 
 export const S = {
   trimW: 6, trimH: 9, pages: 220, paper: PAPER.white,
+  binding: "paperback",   // "paperback" | "hardcover"
+  spineOverride: null,     // inches; overrides the estimated spine (hardcover: KDP calculator value)
   // background: base fill (solid|gradient) with the optional image composited on top.
   bgMode: "solid", bg: "#141414",
   gradient: { from: "#1d3251", to: "#0e1a2b", angle: 90 },

@@ -86,16 +86,35 @@ authoritative; the worked examples above (which match KDP template downloads) do
 **not** add it to the visible spine. Always reconcile against KDP's calculator
 and a proof before a print run. The prototype uses `spine = pages * thickness`.
 
-## Hardcover / case-laminate (NOT yet implemented — verify before building)
+## Hardcover / case-laminate (implemented; numbers confirmed against KDP)
 
-Different from paperback; sources conflict, so confirm each number against KDP's
-calculator before shipping a hardcover mode:
-- Spine uses the same per-page thickness but adds ~0.125 in binding allowance
-  (vs ~0.06 in for paperback).
-- Larger wrap: board overhang (~0.625 in) on all four outer edges.
-- Hinge clearance (~0.375–0.625 in) on each side of the spine where the case
-  bends; keep important elements clear of it.
-- Minimum ~75 pages for hardcover.
+Confirmed from KDP's "Create a Hardcover Cover" guide (help topic
+GDTKFJPNQCBTMRV6) and Print Options (G201834180), checked 2026-06-22. These are
+the values `kdp.js` uses (`HC_*` constants):
+
+| Name | Value | Notes |
+|------|-------|-------|
+| `HC_WRAP` | 0.51 in | File extends this far past each cover edge (turn-in over the boards). The hardcover analogue of bleed. |
+| `HC_SAFE` | 0.635 in | Keep text/art this far inside the cover edge. |
+| `HC_HINGE` | 0.4 in | Keep-clear between the spine and the safe area on front & back (the case bends here). |
+| Barcode | 2.0 × 1.2 in | ≥ 0.76 in from the bottom, ≥ 0.25 in from the spine hinge. |
+| Pages | 75–550 | All hardcover trim sizes. |
+| Trims | 5.5×8.5, 6×9, 6.14×9.21, 7×10, 8.25×11 | |
+| Paper | cream / white / premium color | No groundwood or standard-color for hardcover. |
+
+```
+fullWidth  = HC_WRAP + trimW + spine + trimW + HC_WRAP
+fullHeight = trimH + 2*HC_WRAP
+# safe area: outer edges inset HC_SAFE; spine-fold side inset HC_HINGE
+```
+
+**Spine width is the one unknown.** KDP does not publish per-page thickness
+anywhere static (true for paperback too — our paperback numbers come from KDP
+template downloads). The hardcover case spine is wider than the text block
+because of the boards, and only KDP's cover calculator gives the exact value.
+The app therefore estimates the spine (page-block `pages × thickness`) and lets
+the user paste KDP's exact spine into a "Spine width (from KDP calculator)"
+field, with a prominent warning to confirm + order a proof before printing.
 
 ## Pre-upload checklist (encode as validations)
 

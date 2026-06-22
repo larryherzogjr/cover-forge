@@ -11,6 +11,7 @@ import {
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
   imageRegion, effectiveDPI, dpiSeverity,
   hexToRgb, rgbToHsv, cmykRisk, gradientLine, snap,
+  HC_WRAP, HC_SAFE, HC_HINGE, HC_BARCODE_BOTTOM, HC_PAGE_MIN, HC_PAGE_MAX,
 } from "../src/kdp.js";
 
 const near = (a, b, eps = 1e-9) =>
@@ -99,6 +100,57 @@ test("exported pixel dims == round(full * DPI)", () => {
   const d = dims({ trimW: 8.5, trimH: 11, pages: 300, paper: PAPER.color });
   assert.equal(d.pxW, Math.round(d.fullW * DPI));
   assert.equal(d.pxH, Math.round(d.fullH * DPI));
+});
+
+test("hardcover constants match KDP's published numbers", () => {
+  assert.equal(HC_WRAP, 0.51);
+  assert.equal(HC_SAFE, 0.635);
+  assert.equal(HC_HINGE, 0.4);
+  assert.equal(HC_BARCODE_BOTTOM, 0.76);
+  assert.deepEqual([HC_PAGE_MIN, HC_PAGE_MAX], [75, 550]);
+});
+
+test("hardcover geometry: 0.51 wrap on all edges, 0.635 safe, 0.4 hinge", () => {
+  const d = dims({ trimW: 6, trimH: 9, pages: 300, paper: PAPER.white, binding: "hardcover" });
+  near(d.edge, HC_WRAP);
+  near(d.fullW, 2 * HC_WRAP + 2 * 6 + d.spine); // wrap + back + front + spine
+  near(d.fullH, 9 + 2 * HC_WRAP);
+  near(d.backX, HC_WRAP);
+  near(d.spineX, HC_WRAP + 6);
+  // safe area: outer edges inset 0.635, spine side inset by the 0.4 hinge
+  const back = safeArea(d, "back");
+  near(back.x, HC_WRAP + HC_SAFE);            // 1.145 from the file edge
+  near(back.y, HC_WRAP + HC_SAFE);
+  near(back.x + back.w, d.spineX - HC_HINGE); // spine-side stops one hinge from the fold
+  const front = safeArea(d, "front");
+  near(front.x, d.frontX + HC_HINGE);
+  near(front.x + front.w, (d.fullW - HC_WRAP) - HC_SAFE);
+});
+
+test("hardcover barcode: 0.76 from bottom, clear of the 0.4 hinge", () => {
+  const d = dims({ trimW: 6, trimH: 9, pages: 300, paper: PAPER.white, binding: "hardcover" });
+  const bc = barcodeBox(d);
+  near(bc.bottom, d.fullH - HC_WRAP - HC_BARCODE_BOTTOM);
+  near(bc.right, d.spineX - (HC_HINGE + 0.25)); // 0.25 in from the hinge
+  near(bc.w, 2.0); near(bc.h, 1.2);
+});
+
+test("spineOverride replaces the estimated spine (KDP calculator value)", () => {
+  const est = dims({ trimW: 6, trimH: 9, pages: 300, paper: PAPER.white, binding: "hardcover" });
+  near(est.spine, 300 * PAPER.white);
+  const over = dims({ trimW: 6, trimH: 9, pages: 300, paper: PAPER.white, binding: "hardcover", spineOverride: 0.95 });
+  near(over.spine, 0.95);
+  near(over.fullW, 2 * HC_WRAP + 12 + 0.95);
+});
+
+test("paperback geometry is unchanged by the binding refactor", () => {
+  const d = dims({ trimW: 6, trimH: 9, pages: 220, paper: PAPER.white }); // default binding
+  near(d.edge, BLEED);
+  near(d.fullW, 12.74544); near(d.fullH, 9.25);
+  const back = safeArea(d, "back");
+  near(back.w, 6 - 2 * SAFE); near(back.x, BLEED + SAFE);
+  const bc = barcodeBox(d);
+  near(bc.right, d.spineX - 0.25); near(bc.bottom, d.fullH - BLEED - 0.25);
 });
 
 test("imageRegion: wrap covers the full wrap; front covers trim+bleed", () => {

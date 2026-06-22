@@ -145,10 +145,21 @@ $("paper").addEventListener("change", (e) => { S.paper = +e.target.value; update
 /* ---------- title ---------- */
 $("tTitle").addEventListener("input", (e) => { S.title.text = e.target.value; rerender(); });
 $("tFont").addEventListener("change", (e) => { S.title.font = e.target.value; rerender(); });
-$("tShadow").addEventListener("change", (e) => { S.title.shadow = e.target.checked; rerender(); });
 bindSlider("tSize", "tSizeL", S.title, "size", (v) => v + " pt");
 bindSlider("tY", "tYL", S.title, "y", (v) => v + "%");
 bindColor("tColor", "tColorL", S.title, "color");
+$("tCaps").addEventListener("change", (e) => { S.title.caps = e.target.checked; rerender(); });
+bindSlider("tLs", "tLsL", S.title, "letterSpacing");
+bindSlider("tLh", "tLhL", S.title, "lineHeight");
+bindColor("tStrokeC", "tStrokeCL", S.title.stroke, "color");
+bindSlider("tStrokeW", "tStrokeWL", S.title.stroke, "width", (v) => v + " pt");
+const tShadowAdv = () => { $("tShadowAdv").style.display = S.title.shadow ? "block" : "none"; };
+$("tShadow").addEventListener("change", (e) => { S.title.shadow = e.target.checked; tShadowAdv(); rerender(); });
+tShadowAdv();
+bindSlider("tShBlur", "tShBlurL", S.title, "shadowBlur", (v) => v + " pt");
+bindSlider("tShDX", "tShDXL", S.title, "shadowDX");
+bindSlider("tShDY", "tShDYL", S.title, "shadowDY");
+$("tShOp").addEventListener("input", (e) => { S.title.shadowOpacity = +e.target.value / 100; $("tShOpL").textContent = e.target.value + "%"; rerender(); });
 
 /* ---------- author ---------- */
 $("aText").addEventListener("input", (e) => { S.author.text = e.target.value; rerender(); });
@@ -156,6 +167,10 @@ $("aFont").addEventListener("change", (e) => { S.author.font = e.target.value; r
 bindSlider("aSize", "aSizeL", S.author, "size", (v) => v + " pt");
 bindSlider("aY", "aYL", S.author, "y", (v) => v + "%");
 bindColor("aColor", "aColorL", S.author, "color");
+$("aCaps").addEventListener("change", (e) => { S.author.caps = e.target.checked; rerender(); });
+bindSlider("aLs", "aLsL", S.author, "letterSpacing");
+bindColor("aStrokeC", "aStrokeCL", S.author.stroke, "color");
+bindSlider("aStrokeW", "aStrokeWL", S.author.stroke, "width", (v) => v + " pt");
 
 /* ---------- spine ---------- */
 $("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; rerender(); });
@@ -186,6 +201,7 @@ $("bText").addEventListener("input", (e) => { S.back.text = e.target.value; rere
 $("bFont").addEventListener("change", (e) => { S.back.font = e.target.value; rerender(); });
 bindSlider("bSize", "bSizeL", S.back, "size", (v) => v + " pt");
 bindSlider("bY", "bYL", S.back, "y", (v) => v + "%");
+bindSlider("bLh", "bLhL", S.back, "lineHeight");
 bindColor("bColor", "bColorL", S.back, "color");
 document.querySelectorAll("#bAlignSeg button").forEach((b) => b.addEventListener("click", () => {
   document.querySelectorAll("#bAlignSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");

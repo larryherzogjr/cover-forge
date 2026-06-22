@@ -331,7 +331,23 @@
       <label class="fld"><span>Size <b id="tSizeL" class="mono"></b></span><input type="range" id="tSize" min="24" max="150" value="74"></label>
       <label class="fld"><span>Vertical <b id="tYL" class="mono"></b></span><input type="range" id="tY" min="6" max="92" value="20"></label>
       <div class="colorrow"><input type="color" id="tColor" value="#f4efe3"><span class="mono" id="tColorL">#f4efe3</span>
-        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tShadow" checked> shadow</label></div>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tCaps"> all caps</label></div>
+      <div class="row" style="margin-top:11px">
+        <label class="fld"><span>Letter-spacing <b id="tLsL" class="mono">0</b></span><input type="range" id="tLs" min="-2" max="12" step="0.5" value="0"></label>
+        <label class="fld"><span>Line-height <b id="tLhL" class="mono">1.12</b></span><input type="range" id="tLh" min="0.8" max="2" step="0.02" value="1.12"></label>
+      </div>
+      <div class="colorrow"><input type="color" id="tStrokeC" value="#0e1a2b"><span class="mono" id="tStrokeCL">#0e1a2b</span>
+        <span class="mini" style="margin-left:auto">outline</span></div>
+      <label class="fld" style="margin-top:9px"><span>Outline width <b id="tStrokeWL" class="mono">0 pt</b></span><input type="range" id="tStrokeW" min="0" max="8" step="0.5" value="0"></label>
+      <label class="gtog" style="width:100%;justify-content:flex-start"><input type="checkbox" id="tShadow" checked> drop shadow</label>
+      <div id="tShadowAdv" style="margin-top:11px">
+        <label class="fld"><span>Shadow blur <b id="tShBlurL" class="mono">2 pt</b></span><input type="range" id="tShBlur" min="0" max="20" step="0.5" value="2"></label>
+        <div class="row">
+          <label class="fld"><span>Offset X <b id="tShDXL" class="mono">1</b></span><input type="range" id="tShDX" min="-12" max="12" step="0.5" value="1"></label>
+          <label class="fld"><span>Offset Y <b id="tShDYL" class="mono">2</b></span><input type="range" id="tShDY" min="-12" max="12" step="0.5" value="2"></label>
+        </div>
+        <label class="fld"><span>Shadow opacity <b id="tShOpL" class="mono">45%</b></span><input type="range" id="tShOp" min="0" max="100" value="45"></label>
+      </div>
     </div>
 
     <div class="grp">
@@ -344,7 +360,14 @@
       </label>
       <label class="fld"><span>Size <b id="aSizeL" class="mono"></b></span><input type="range" id="aSize" min="14" max="64" value="30"></label>
       <label class="fld"><span>Vertical <b id="aYL" class="mono"></b></span><input type="range" id="aY" min="6" max="96" value="90"></label>
-      <div class="colorrow"><input type="color" id="aColor" value="#c6a75e"><span class="mono" id="aColorL">#c6a75e</span></div>
+      <div class="colorrow"><input type="color" id="aColor" value="#c6a75e"><span class="mono" id="aColorL">#c6a75e</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="aCaps"> all caps</label></div>
+      <div class="row" style="margin-top:11px">
+        <label class="fld"><span>Letter-spacing <b id="aLsL" class="mono">0</b></span><input type="range" id="aLs" min="-1" max="12" step="0.5" value="0"></label>
+        <label class="fld"><span>Outline width <b id="aStrokeWL" class="mono">0 pt</b></span><input type="range" id="aStrokeW" min="0" max="6" step="0.5" value="0"></label>
+      </div>
+      <div class="colorrow"><input type="color" id="aStrokeC" value="#0e1a2b"><span class="mono" id="aStrokeCL">#0e1a2b</span>
+        <span class="mini" style="margin-left:auto">outline color</span></div>
     </div>
 
     <div class="grp">
@@ -367,6 +390,7 @@
         <label class="fld"><span>Size <b id="bSizeL" class="mono"></b></span><input type="range" id="bSize" min="9" max="30" value="16"></label>
         <label class="fld"><span>Top start <b id="bYL" class="mono"></b></span><input type="range" id="bY" min="2" max="70" value="7"></label>
       </div>
+      <label class="fld"><span>Line-height <b id="bLhL" class="mono">1.34</b></span><input type="range" id="bLh" min="1" max="2.2" step="0.02" value="1.34"></label>
       <div class="seg" id="bAlignSeg"><button class="on" data-align="left">Left</button><button data-align="center">Center</button></div>
       <div class="colorrow" style="margin-top:10px"><input type="color" id="bColor" value="#e9e3d4"><span class="mono" id="bColorL">#e9e3d4</span></div>
       <p class="mini" style="margin-top:8px">Text auto-flows around the ISBN / barcode keep-clear zone in the lower-right of the back cover — no manual nudging needed.</p>

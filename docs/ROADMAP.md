@@ -22,9 +22,9 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 
 - [ ] Free **drag-positioning** for any text block on front/back (snap to safe-area guides).
 - [ ] Additional text blocks: subtitle, series name, front pull-quote/endorsement, back tagline, author bio.
-- [ ] Text controls: stroke/outline, letter-spacing, line-height, all-caps toggle, shadow tuning (offset/blur/opacity).
-- [ ] **Solid + gradient** background mode (no image required).
-- [ ] Image **blend modes** (normal/multiply/overlay/darken/lighten/color) + simple RGB color grading.
+- [x] Text controls: stroke/outline, letter-spacing, line-height, all-caps toggle, shadow tuning (offset/blur/opacity). Title gets the full set; author gets caps/letter-spacing/outline; back gets line-height.
+- [x] **Solid + gradient** background mode (no image required). Two-stop linear gradient at an adjustable angle (`kdp.gradientLine`).
+- [x] Image **blend modes** (normal/multiply/screen/overlay/darken/lighten) via `globalCompositeOperation`. (RGB color grading still TODO.)
 - [ ] **Overlay/logo layers**: place additional PNGs (e.g. a publisher mark or a background-removed subject) with their own move/scale.
 
 ## M3 — Workflow & server features (Tier 3)

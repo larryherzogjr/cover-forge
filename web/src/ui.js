@@ -130,6 +130,15 @@ function bindColor(id, labelId, obj, key) {
   const el = $(id), lab = $(labelId);
   el.addEventListener("input", () => { obj[key] = el.value; lab.textContent = el.value; rerender(); });
 }
+// Wire a compact optional text block (text/font/size/color/caps) by id prefix.
+function bindTextBlock(prefix, blockKey) {
+  const o = S[blockKey];
+  $(prefix + "Text").addEventListener("input", (e) => { o.text = e.target.value; rerender(); });
+  $(prefix + "Font").addEventListener("change", (e) => { o.font = e.target.value; rerender(); });
+  bindSlider(prefix + "Size", prefix + "SizeL", o, "size", (v) => v + " pt");
+  bindColor(prefix + "Color", prefix + "ColorL", o, "color");
+  $(prefix + "Caps").addEventListener("change", (e) => { o.caps = e.target.checked; rerender(); });
+}
 
 /* ---------- book spec ---------- */
 $("trim").addEventListener("change", (e) => {
@@ -171,6 +180,11 @@ $("aCaps").addEventListener("change", (e) => { S.author.caps = e.target.checked;
 bindSlider("aLs", "aLsL", S.author, "letterSpacing");
 bindColor("aStrokeC", "aStrokeCL", S.author.stroke, "color");
 bindSlider("aStrokeW", "aStrokeWL", S.author.stroke, "width", (v) => v + " pt");
+
+/* ---------- optional front blocks: subtitle / series / pull-quote ---------- */
+bindTextBlock("sub", "subtitle");
+bindTextBlock("ser", "series");
+bindTextBlock("pq", "pullquote");
 
 /* ---------- spine ---------- */
 $("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; rerender(); });

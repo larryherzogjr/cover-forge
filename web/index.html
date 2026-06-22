@@ -351,6 +351,20 @@
     </div>
 
     <div class="grp">
+      <p class="eyebrow">Subtitle <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
+      <label class="fld"><textarea id="subText" rows="2" placeholder="Optional subtitle"></textarea></label>
+      <label class="fld">
+        <select id="subFont">
+          <optgroup label="Serif"><option>Playfair Display</option><option selected>Cormorant Garamond</option><option>EB Garamond</option><option>Libre Baskerville</option></optgroup>
+          <optgroup label="Sans / display"><option>Oswald</option><option>Bebas Neue</option><option>Montserrat</option><option>Archivo Black</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="subSizeL" class="mono"></b></span><input type="range" id="subSize" min="10" max="80" value="28"></label>
+      <div class="colorrow"><input type="color" id="subColor" value="#e9e3d4"><span class="mono" id="subColorL">#e9e3d4</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="subCaps"> all caps</label></div>
+    </div>
+
+    <div class="grp">
       <p class="eyebrow">Author</p>
       <label class="fld"><input type="text" id="aText" value="Larry Herzog Jr."></label>
       <label class="fld">
@@ -368,6 +382,34 @@
       </div>
       <div class="colorrow"><input type="color" id="aStrokeC" value="#0e1a2b"><span class="mono" id="aStrokeCL">#0e1a2b</span>
         <span class="mini" style="margin-left:auto">outline color</span></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Series <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
+      <label class="fld"><input type="text" id="serText" placeholder="Series / collection name"></label>
+      <label class="fld">
+        <select id="serFont">
+          <optgroup label="Sans / display"><option selected>Montserrat</option><option>Oswald</option><option>Bebas Neue</option><option>Archivo Black</option></optgroup>
+          <optgroup label="Serif"><option>Cormorant Garamond</option><option>EB Garamond</option><option>Playfair Display</option><option>Libre Baskerville</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="serSizeL" class="mono"></b></span><input type="range" id="serSize" min="8" max="48" value="16"></label>
+      <div class="colorrow"><input type="color" id="serColor" value="#c6a75e"><span class="mono" id="serColorL">#c6a75e</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="serCaps" checked> all caps</label></div>
+    </div>
+
+    <div class="grp">
+      <p class="eyebrow">Pull-quote <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
+      <label class="fld"><textarea id="pqText" rows="2" placeholder="“An endorsement or tagline…”"></textarea></label>
+      <label class="fld">
+        <select id="pqFont">
+          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
+          <optgroup label="Sans / display"><option>Montserrat</option><option>Oswald</option></optgroup>
+        </select>
+      </label>
+      <label class="fld"><span>Size <b id="pqSizeL" class="mono"></b></span><input type="range" id="pqSize" min="9" max="40" value="15"></label>
+      <div class="colorrow"><input type="color" id="pqColor" value="#d9c9a3"><span class="mono" id="pqColorL">#d9c9a3</span>
+        <label class="gtog" style="margin-left:auto"><input type="checkbox" id="pqCaps"> all caps</label></div>
     </div>
 
     <div class="grp">

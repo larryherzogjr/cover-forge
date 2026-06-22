@@ -26,6 +26,11 @@ export const S = {
   // Both are resolution-independent so preview == export. Drag to reposition.
   title: { text: "The Purest Gospel", font: "Playfair Display", size: 74, x: 0.5, y: 20, color: "#f4efe3", ...titleStyle },
   author: { text: "Larry Herzog Jr.", font: "Cormorant Garamond", size: 30, x: 0.5, y: 90, color: "#c6a75e", caps: false, letterSpacing: 0, lineHeight: 1.12, stroke: { color: "#0e1a2b", width: 0 } },
+  // Optional front blocks — empty by default (drawn only once they have text),
+  // share the title/author shape so the same render + drag machinery applies.
+  subtitle: { text: "", font: "Cormorant Garamond", size: 28, x: 0.5, y: 33, color: "#e9e3d4", caps: false, letterSpacing: 0, lineHeight: 1.15, stroke: { color: "#0e1a2b", width: 0 } },
+  series: { text: "", font: "Montserrat", size: 16, x: 0.5, y: 10, color: "#c6a75e", caps: true, letterSpacing: 2, lineHeight: 1.15, stroke: { color: "#0e1a2b", width: 0 } },
+  pullquote: { text: "", font: "EB Garamond", size: 15, x: 0.5, y: 80, color: "#d9c9a3", caps: false, letterSpacing: 0, lineHeight: 1.2, stroke: { color: "#0e1a2b", width: 0 } },
   spine: { text: "The Purest Gospel — Herzog", color: "#f4efe3", flip: false },
   back: {
     text: "Paul's letter to the Romans has shaped the church's confession of grace for two thousand years. In this volume the gospel is set forth in its purest form: God's righteousness revealed apart from the law, received by faith alone, for the ungodly.\n\nWritten for confessional Lutheran laity and for anyone wearied by moralism, these expositions move verse by verse through the whole epistle — justification, the bondage of the will, the comfort of election, and the shape of the Christian life lived from faith.\n\nHere is no self-help and no ladder to climb. Here is Christ, delivered in the ordinary means of grace, for you.",

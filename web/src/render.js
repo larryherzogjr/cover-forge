@@ -17,17 +17,17 @@ const cx = cv.getContext("2d");
 let PREV_SCALE = 1;                 // px-per-inch of the current preview
 export const getPrevScale = () => PREV_SCALE;
 
-// Draggable front blocks. Bounding boxes (preview-scale px) are recorded during
-// the live render so ui.js can hit-test pointer events against them.
-export const FRONT_BLOCKS = ["title", "author"];
+// Draggable front blocks, in draw order (back-to-front). Bounding boxes
+// (preview-scale px) are recorded during the live render so ui.js can hit-test
+// pointer events against them. Add a block here + in state.js to make it real.
+export const FRONT_BLOCKS = ["series", "title", "subtitle", "pullquote", "author"];
 const hitBoxes = {};
 export const getHitBox = (kind) => hitBoxes[kind];
 export function frontHitTest(px, py) {
-  // topmost-first: author sits over title only if overlapping; check both, prefer
-  // the smaller/last-drawn. Simple containment is enough for two blocks.
-  for (const kind of FRONT_BLOCKS) {
-    const b = hitBoxes[kind];
-    if (b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return kind;
+  // front-to-back: prefer the topmost (last-drawn) block when boxes overlap.
+  for (let i = FRONT_BLOCKS.length - 1; i >= 0; i--) {
+    const b = hitBoxes[FRONT_BLOCKS[i]];
+    if (b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) return FRONT_BLOCKS[i];
   }
   return null;
 }
@@ -73,10 +73,8 @@ export function drawCover(ctx, scale, showGuides, recordHits) {
 
   // ---- BACK COVER VERBIAGE (flows around barcode zone) ----
   drawBackText(ctx, scale);
-  // ---- TITLE (front cover) ----
-  drawWrapText(ctx, S.title, front, scale, "title", recordHits);
-  // ---- AUTHOR ----
-  drawWrapText(ctx, S.author, front, scale, "author", recordHits);
+  // ---- FRONT BLOCKS (title/subtitle/series/pull-quote/author; draggable) ----
+  for (const kind of FRONT_BLOCKS) drawWrapText(ctx, S[kind], front, scale, kind, recordHits);
 
   // ---- SPINE TEXT ----
   if (S.spine.text && spineTextAllowed(S.pages)) {

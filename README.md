@@ -9,27 +9,38 @@ accounts, no subscription, no stock-photo upsell — runs on your own server.
 
 ## Status
 
-`web/index.html` is a **working single-file prototype** (no dependencies — open
-it in a browser). It does trim/spine/bleed math, a live 2D wrap preview with
-guides, a 3D preview, background image with opacity + pan/zoom, palette
-extraction, front title/author, spine text (with orientation flip), a back-cover
-blurb that flows around the barcode zone, and PNG export at exact 300-DPI dims.
+Working. The frontend is a **modular static app** (vanilla JS + Canvas, ES
+modules — no build step) in `web/`; a small Flask API in `server/` covers the two
+browser-impossible features (background removal, print-grade PDF). Implemented:
 
-The repo is set up to grow this into a proper app: a modular static frontend plus
-a small Flask API for the two browser-impossible features (background removal and
-print-grade PDF export).
+- **Paperback and hardcover** full-wrap geometry (spine/bleed/wrap/safe/hinge),
+  live 2D preview with guides, 3D preview, exact 300-DPI pixel dims.
+- Background image (opacity, blend, pan/zoom) plus solid/gradient fills, palette
+  extraction, and **overlay/logo layers**.
+- Front title/author/subtitle/series/pull-quote and back tagline/bio with full
+  type controls (stroke, tracking, line-height, caps, shadow), **free
+  drag-positioning** + keyboard nudging, spine text, and a back blurb that flows
+  around the barcode zone.
+- **Pre-flight** effective-DPI and CMYK-shift warnings.
+- Export: **print PDF** (RGB or CMYK, via the API), print-wrap PNG, ebook front.
+- **Project save/load** (portable JSON) + autosave, and undo/redo.
+
+> ES modules need an HTTP origin, so the app no longer opens from `file://` —
+> serve `web/` over HTTP (below).
 
 ## Quick start
 
 ```bash
-# Frontend (the prototype works standalone)
+# Frontend — serve web/ over HTTP, then open the printed URL
 cd web && python3 -m http.server 8080   # http://localhost:8080
-# or just open web/index.html
 
-# API (scaffold)
+# API (PDF export; background removal needs rembg on a GPU box)
 cd server && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 flask --app app run --port 5004 --debug
+
+# Tests for the pure geometry
+cd web && npm test
 ```
 
 ## Docs

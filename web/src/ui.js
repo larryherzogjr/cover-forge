@@ -9,7 +9,7 @@ import {
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
   HC_PAGE_MIN, HC_PAGE_MAX,
 } from "./kdp.js";
-import { render, drawCover, getPrevScale, rotateBy, pickAt, getHitBox, isBackBlock } from "./render.js";
+import { render, getPrevScale, rotateBy, pickAt, getHitBox, isBackBlock } from "./render.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
 import { ensureFontsLoaded, loadFonts } from "./fonts.js";
 

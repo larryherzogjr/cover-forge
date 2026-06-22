@@ -1,21 +1,8 @@
-// fonts.js — cover-design font list + ensure-loaded-before-export helper.
-// These are the fonts offered for the BOOK covers themselves (the app chrome —
-// Space Grotesk / Inter / Space Mono — is separate, see CLAUDE.md). The faces
-// are loaded by the Google Fonts <link> in index.html; this module centralizes
-// the family list and a single readiness gate.
-
-export const FONTS = [
-  // Serif
-  "Playfair Display",
-  "Cormorant Garamond",
-  "EB Garamond",
-  "Libre Baskerville",
-  // Sans / display
-  "Oswald",
-  "Bebas Neue",
-  "Montserrat",
-  "Archivo Black",
-];
+// fonts.js — ensure cover fonts are loaded before render/export. The faces are
+// linked from Google Fonts in index.html (the cover-design menu is separate from
+// the app chrome — Space Grotesk / Inter / Space Mono; see CLAUDE.md). Canvas
+// rasterizes a fallback for any face that hasn't loaded yet, so exports must
+// await loadFonts() for the families actually in use.
 
 // Resolve once the browser reports all linked faces are ready, so the first
 // render (and any canvas export) draws with real type, not a fallback.

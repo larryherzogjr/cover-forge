@@ -339,7 +339,7 @@ function build3D() {
   book.appendChild(pg);
   applyRot();
 }
-export function applyRot() {
+function applyRot() {
   const b = $("book");
   if (b) b.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
 }

@@ -1,6 +1,6 @@
-// export.js — output deliverables. PNG today (print wrap @300 DPI at exact KDP
-// pixel dims, and a 1600x2560 ebook front). A true flattened PDF/X-1a export
-// will call the Flask server (server/app.py /api/export-pdf) — M1 in the roadmap.
+// export.js — output deliverables: print-wrap PNG @300 DPI at exact KDP pixel
+// dims, a 1600x2560 ebook front, and a flattened print PDF (RGB or CMYK) via the
+// Flask server (server/app.py /api/export-pdf). Server calls degrade gracefully.
 
 import { S } from "./state.js";
 import { dims, DPI, BLEED } from "./kdp.js";
@@ -11,7 +11,7 @@ import { loadFonts } from "./fonts.js";
 // await these so a freshly-picked font can't rasterize as a fallback.
 const usedFonts = () => [
   S.title.font, S.author.font, S.subtitle.font, S.series.font, S.pullquote.font,
-  S.back.font, "Cormorant Garamond",
+  S.tagline.font, S.bio.font, S.back.font, "Cormorant Garamond",
 ];
 
 // API origin for the server-only features (PDF, bg-removal). In dev the static

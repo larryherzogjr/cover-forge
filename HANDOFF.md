@@ -1,5 +1,12 @@
 # Cover Forge — Handoff
 
+> **Status (updated):** the original prototype has since been built out — M0–M4
+> are implemented (module refactor, DPI/CMYK pre-flight, PDF/CMYK export,
+> gradient/blend backgrounds, full text controls, drag-positioning + keyboard
+> nudging, front/back text blocks, overlay layers, project save/load + autosave,
+> background removal, hardcover mode, undo/redo). See `docs/ROADMAP.md` for the
+> per-item status. The sections below are the original handoff, kept for context.
+
 This document hands a working prototype off to a fresh Claude Code instance for
 local development, GitHub sync, and server deployment. It explains what exists,
 why decisions were made, what's done, and what's left. For the loaded-every-

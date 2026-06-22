@@ -5,10 +5,11 @@
 // preview and the 300-DPI export produce an identical crop.
 
 import { S } from "./state.js";
-import { dims, safeArea, barcodeBox, spineTextAllowed, fontPx, DPI, BLEED, SAFE } from "./kdp.js";
+import { dims, safeArea, barcodeBox, spineTextAllowed, fontPx, gradientLine, hexToRgb, DPI, BLEED, SAFE } from "./kdp.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const withAlpha = (hex, a) => { const { r, g, b } = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; };
 
 const cv = $("preview");
 const cx = cv.getContext("2d");
@@ -16,18 +17,33 @@ const cx = cv.getContext("2d");
 let PREV_SCALE = 1;                 // px-per-inch of the current preview
 export const getPrevScale = () => PREV_SCALE;
 
+// Base fill (solid or linear gradient) for any W*H px region. Shared by the
+// wrap render and the ebook export so they stay consistent.
+export function fillBackground(ctx, W, H) {
+  if (S.bgMode === "gradient") {
+    const gl = gradientLine(S.gradient.angle, W, H);
+    const grad = ctx.createLinearGradient(gl.x0, gl.y0, gl.x1, gl.y1);
+    grad.addColorStop(0, S.gradient.from); grad.addColorStop(1, S.gradient.to);
+    ctx.fillStyle = grad;
+  } else {
+    ctx.fillStyle = S.bg;
+  }
+  ctx.fillRect(0, 0, W, H);
+}
+
 /* ---------- drawing core (resolution-independent via px scale) ---------- */
 export function drawCover(ctx, scale, showGuides) {
   const d = dims(S);
   const W = d.fullW * scale, H = d.fullH * scale;
   ctx.clearRect(0, 0, W, H);
 
-  // base fill
-  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  // base fill — solid or linear gradient
+  fillBackground(ctx, W, H);
 
-  // artwork (opacity over base, with user pan/zoom)
+  // artwork (opacity + blend mode over base, with user pan/zoom)
   if (S.img) {
     ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, S.imgOpacity));
+    ctx.globalCompositeOperation = S.imgBlend || "source-over";
     const px = S.imgX * scale, py = S.imgY * scale;
     if (S.fit === "front") {
       drawImageFit(ctx, S.img, d.frontX * scale, 0, (S.trimW + BLEED) * scale, H, S.imgScale, px, py);
@@ -63,18 +79,33 @@ export function drawCover(ctx, scale, showGuides) {
 export function drawWrapText(ctx, o, box, scale, kind) {
   if (!o.text.trim()) return;
   ctx.save();
-  ctx.fillStyle = o.color; ctx.textAlign = "center";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
   const px = Math.max(6, fontPx(o.size, scale));   // size slider is in points
   ctx.font = (kind === "title" ? "700 " : "600 ") + px + "px '" + o.font + "'";
-  ctx.textBaseline = "middle";
+  if (o.letterSpacing) ctx.letterSpacing = fontPx(o.letterSpacing, scale) + "px"; // pt -> px
+  const text = o.caps ? o.text.toUpperCase() : o.text;
   const cx2 = box.x + box.w / 2;
   const cy = box.h * (o.y / 100);
-  const lines = wrapLines(ctx, o.text, box.w * 0.84);
-  const lh = px * 1.12;
+  const lines = wrapLines(ctx, text, box.w * 0.84);
+  const lh = px * (o.lineHeight || 1.12);
+  const strokePx = o.stroke && o.stroke.width ? fontPx(o.stroke.width, scale) : 0;
   let y = cy - (lines.length - 1) * lh / 2;
   for (const ln of lines) {
-    if (o.shadow) { ctx.save(); ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.fillText(ln, cx2 + px * 0.03, y + px * 0.04); ctx.restore(); }
-    ctx.fillStyle = o.color; ctx.fillText(ln, cx2, y); y += lh;
+    if (o.shadow) {
+      ctx.save();
+      ctx.shadowColor = withAlpha(o.shadowColor || "#000000", o.shadowOpacity != null ? o.shadowOpacity : 0.45);
+      ctx.shadowBlur = fontPx(o.shadowBlur || 0, scale);
+      ctx.shadowOffsetX = fontPx(o.shadowDX || 0, scale);
+      ctx.shadowOffsetY = fontPx(o.shadowDY || 0, scale);
+      ctx.fillStyle = o.color; ctx.fillText(ln, cx2, y);
+      ctx.restore();
+    }
+    if (strokePx > 0) {
+      ctx.lineWidth = strokePx; ctx.strokeStyle = o.stroke.color; ctx.lineJoin = "round";
+      ctx.strokeText(ln, cx2, y);
+    }
+    ctx.fillStyle = o.color; ctx.fillText(ln, cx2, y);
+    y += lh;
   }
   ctx.restore();
 }
@@ -98,7 +129,7 @@ function drawBackText(ctx, scale) {
   const avoidY1 = bc.bottom * scale;
 
   const px = Math.max(6, fontPx(o.size, scale)); // points
-  const lh = px * 1.34;
+  const lh = px * (o.lineHeight || 1.34);
   ctx.save();
   ctx.fillStyle = o.color; ctx.textBaseline = "top";
   ctx.font = px + "px '" + o.font + "'";

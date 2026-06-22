@@ -10,7 +10,7 @@ import {
   DPI_MIN, DPI_FLOOR,
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
   imageRegion, effectiveDPI, dpiSeverity,
-  hexToRgb, rgbToHsv, cmykRisk,
+  hexToRgb, rgbToHsv, cmykRisk, gradientLine,
 } from "../src/kdp.js";
 
 const near = (a, b, eps = 1e-9) =>
@@ -142,6 +142,17 @@ test("rgbToHsv basics", () => {
   near(red.s, 1); near(red.v, 1);
   const white = rgbToHsv("#ffffff");
   near(white.s, 0); near(white.v, 1);
+});
+
+test("gradientLine spans the box at 0/90/45 degrees", () => {
+  const horiz = gradientLine(0, 100, 60);
+  near(horiz.x0, 0); near(horiz.x1, 100); near(horiz.y0, 30); near(horiz.y1, 30);
+  const vert = gradientLine(90, 100, 60);
+  near(vert.x0, 50); near(vert.x1, 50); near(vert.y0, 0); near(vert.y1, 60);
+  // 45deg endpoints stay symmetric about the center
+  const diag = gradientLine(45, 100, 60);
+  near((diag.x0 + diag.x1) / 2, 50);
+  near((diag.y0 + diag.y1) / 2, 30);
 });
 
 test("cmykRisk flags vivid colors, spares brand navy/gold/paper", () => {

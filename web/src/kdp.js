@@ -130,3 +130,15 @@ export function cmykRisk(hex) {
   const { s, v } = rgbToHsv(hex);
   return s >= CMYK_SAT_RISK && v >= CMYK_VAL_RISK;
 }
+
+/* ---------- gradient geometry (pure) ---------- */
+// Endpoints for a linear gradient that spans a w*h box at angleDeg, measured
+// from the x-axis: 0 = left->right, 90 = top->bottom. The line is extended so
+// the gradient covers the whole box (incl. corners) at any angle.
+export function gradientLine(angleDeg, w, h) {
+  const a = (angleDeg * Math.PI) / 180;
+  const dx = Math.cos(a), dy = Math.sin(a);
+  const cx = w / 2, cy = h / 2;
+  const half = Math.abs(dx) * w / 2 + Math.abs(dy) * h / 2;
+  return { x0: cx - dx * half, y0: cy - dy * half, x1: cx + dx * half, y1: cy + dy * half };
+}

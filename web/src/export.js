@@ -4,7 +4,7 @@
 
 import { S } from "./state.js";
 import { dims, DPI, BLEED } from "./kdp.js";
-import { drawCover, drawImageFit, drawWrapText } from "./render.js";
+import { drawCover, drawImageFit, drawWrapText, fillBackground } from "./render.js";
 
 // API origin for the server-only features (PDF, bg-removal). In dev the static
 // site is on :8080 and Flask on :5004; in prod nginx proxies same-origin /api.
@@ -24,9 +24,10 @@ export function exportWrap() {
 export function exportEbook() {
   const W = 1600, H = 2560; const c = document.createElement("canvas"); c.width = W; c.height = H;
   const ctx = c.getContext("2d");
-  ctx.fillStyle = S.bg; ctx.fillRect(0, 0, W, H);
+  fillBackground(ctx, W, H);
   if (S.img) {
     ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, S.imgOpacity));
+    ctx.globalCompositeOperation = S.imgBlend || "source-over";
     const es = W / (S.trimW + BLEED); drawImageFit(ctx, S.img, 0, 0, W, H, S.imgScale, S.imgX * es, S.imgY * es); ctx.restore();
   }
   const box = { x: 0, y: 0, w: W, h: H };

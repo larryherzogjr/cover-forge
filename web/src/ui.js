@@ -162,10 +162,23 @@ $("sText").addEventListener("input", (e) => { S.spine.text = e.target.value; rer
 bindColor("sColor", "sColorL", S.spine, "color");
 $("sFlip").addEventListener("change", (e) => { S.spine.flip = e.target.checked; rerender(); });
 
-/* ---------- image opacity + base color ---------- */
+/* ---------- background fill (solid / gradient) ---------- */
+document.querySelectorAll("#bgModeSeg button").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll("#bgModeSeg button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
+  S.bgMode = b.dataset.bg;
+  $("solidWrap").style.display = S.bgMode === "solid" ? "block" : "none";
+  $("gradWrap").style.display = S.bgMode === "gradient" ? "block" : "none";
+  rerender();
+}));
+bindColor("bgColor", "bgColorL", S, "bg");
+bindColor("gradFrom", "gradFromL", S.gradient, "from");
+bindColor("gradTo", "gradToL", S.gradient, "to");
+$("gradAngle").addEventListener("input", (e) => { S.gradient.angle = +e.target.value; $("gradAngleL").textContent = e.target.value + "°"; rerender(); });
+
+/* ---------- image opacity + blend ---------- */
 $("opacity").addEventListener("input", (e) => { S.imgOpacity = +e.target.value / 100; $("opL").textContent = e.target.value + "%"; rerender(); });
 $("opL").textContent = "100%";
-bindColor("bgColor", "bgColorL", S, "bg");
+$("imgBlend").addEventListener("change", (e) => { S.imgBlend = e.target.value; rerender(); });
 
 /* ---------- back cover ---------- */
 $("bText").value = S.back.text;

@@ -271,6 +271,23 @@
   <!-- ============ RIGHT: DESIGN ============ -->
   <div class="panel right">
     <div class="grp">
+      <p class="eyebrow">Background</p>
+      <div class="seg" id="bgModeSeg">
+        <button class="on" data-bg="solid">Solid</button>
+        <button data-bg="gradient">Gradient</button>
+      </div>
+      <div id="solidWrap" style="margin-top:10px">
+        <div class="colorrow"><input type="color" id="bgColor" value="#141414"><span class="mono" id="bgColorL">#141414</span><span class="mini" style="margin-left:auto">fill color</span></div>
+      </div>
+      <div id="gradWrap" style="display:none;margin-top:10px">
+        <div class="colorrow"><input type="color" id="gradFrom" value="#1d3251"><span class="mono" id="gradFromL">#1d3251</span><span class="mini" style="margin-left:auto">from</span></div>
+        <div class="colorrow" style="margin-top:8px"><input type="color" id="gradTo" value="#0e1a2b"><span class="mono" id="gradToL">#0e1a2b</span><span class="mini" style="margin-left:auto">to</span></div>
+        <label class="fld" style="margin-top:10px"><span>Angle <b id="gradAngleL" class="mono">90°</b></span><input type="range" id="gradAngle" min="0" max="360" value="90"></label>
+      </div>
+      <p class="mini" style="margin-top:8px">Solid or gradient fill behind everything — make a typographic cover with no image at all.</p>
+    </div>
+
+    <div class="grp">
       <p class="eyebrow">Artwork</p>
       <div class="filedrop" id="drop">
         <strong>Drop / choose image</strong><br>background art for the wrap
@@ -282,7 +299,16 @@
         <button data-fit="front">Front only</button>
       </div>
       <label class="fld" style="margin-top:12px"><span>Image opacity <b id="opL" class="mono"></b></span><input type="range" id="opacity" min="0" max="100" value="100"></label>
-      <div class="colorrow"><input type="color" id="bgColor" value="#141414"><span class="mono" id="bgColorL">#141414</span><span class="mini" style="margin-left:auto">base behind image</span></div>
+      <label class="fld"><span>Blend mode</span>
+        <select id="imgBlend">
+          <option value="source-over">Normal</option>
+          <option value="multiply">Multiply</option>
+          <option value="screen">Screen</option>
+          <option value="overlay">Overlay</option>
+          <option value="darken">Darken</option>
+          <option value="lighten">Lighten</option>
+        </select>
+      </label>
       <label class="fld" style="margin-top:12px"><span>Image size <b id="scaleL" class="mono">100%</b></span><input type="range" id="scale" min="20" max="800" value="100"></label>
       <button class="btn ghost" id="imgReset" style="padding:8px;font-size:12px;margin-bottom:0">Reset image position</button>
       <p class="mini" style="margin-top:8px">Drag the preview to move the art · scroll over it to zoom at the cursor.</p>

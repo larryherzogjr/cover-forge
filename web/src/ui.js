@@ -495,10 +495,31 @@ function dragSelected(e) {
   const topP = (BLEED + SAFE) / d.fullH * 100, botP = (d.fullH - BLEED - SAFE) / d.fullH * 100;
   o.x = clamp(snap((ax - x0) / w, [0.5], tol / w), 0, 1);
   o.y = clamp(snap(ay / H * 100, [topP, 50, botP], tol / H * 100), 0, 100);
-  if (drag.token === "title" || drag.token === "author") {
-    const yEl = drag.token === "title" ? "tY" : "aY", yLab = drag.token === "title" ? "tYL" : "aYL";
-    $(yEl).value = clamp(Math.round(o.y), +$(yEl).min, +$(yEl).max);
-    $(yLab).textContent = Math.round(o.y) + "%";
+  syncBlockYSlider(drag.token);
+  rerender();
+}
+
+// Keep the title/author vertical slider in step with a moved block.
+function syncBlockYSlider(token) {
+  if (token !== "title" && token !== "author") return;
+  const yEl = token === "title" ? "tY" : "aY", yLab = token === "title" ? "tYL" : "aYL";
+  $(yEl).value = clamp(Math.round(S[token].y), +$(yEl).min, +$(yEl).max);
+  $(yLab).textContent = Math.round(S[token].y) + "%";
+}
+
+// Nudge the selected element by inches (keyboard arrows; Shift = coarse).
+function nudgeSelected(dxIn, dyIn) {
+  if (!S.selected) return;
+  const d = dims(S);
+  if (S.selected.startsWith("overlay:")) {
+    const ov = overlayById(S.selected.slice(8)); if (!ov) return;
+    ov.cx = clamp(ov.cx + dxIn, 0, d.fullW);
+    ov.cy = clamp(ov.cy + dyIn, 0, d.fullH);
+  } else {
+    const o = S[S.selected];
+    o.x = clamp(o.x + dxIn / S.trimW, 0, 1);
+    o.y = clamp(o.y + dyIn / d.fullH * 100, 0, 100);
+    syncBlockYSlider(S.selected);
   }
   rerender();
 }
@@ -683,9 +704,26 @@ $("projFile").onchange = (e) => { const f = e.target.files[0]; if (f) loadProjec
 
 $("undoBtn").onclick = undo;
 $("redoBtn").onclick = redo;
+const NUDGE = { fine: 0.01, coarse: 0.1 }; // inches per arrow press
 window.addEventListener("keydown", (e) => {
   const tag = e.target && e.target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return; // leave native field undo alone
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return; // leave native field keys alone
+
+  // selection keys (no modifier): arrows nudge, Esc deselects, Del removes an overlay
+  if (S.selected && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const step = e.shiftKey ? NUDGE.coarse : NUDGE.fine;
+    if (e.key === "ArrowLeft") { e.preventDefault(); nudgeSelected(-step, 0); return; }
+    if (e.key === "ArrowRight") { e.preventDefault(); nudgeSelected(step, 0); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); nudgeSelected(0, -step); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); nudgeSelected(0, step); return; }
+    if (e.key === "Escape") { e.preventDefault(); S.selected = null; updateOverlayPanel(); rerender(); return; }
+    if ((e.key === "Delete" || e.key === "Backspace") && S.selected.startsWith("overlay:")) {
+      e.preventDefault(); const ov = selectedOverlay();
+      if (ov) { S.overlays = S.overlays.filter((o) => o !== ov); S.selected = null; updateOverlayPanel(); rerender(); }
+      return;
+    }
+  }
+
   if (!(e.metaKey || e.ctrlKey)) return;
   if (e.key === "z" && !e.shiftKey) { e.preventDefault(); undo(); }
   else if ((e.key === "z" && e.shiftKey) || e.key === "y") { e.preventDefault(); redo(); }

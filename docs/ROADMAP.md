@@ -39,7 +39,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 
 - [ ] IngramSpark mode (different per-page thickness; documented in code comments).
 - [ ] Per-trim barcode-position nuance if Amazon's placement varies by size.
-- [ ] Keyboard nudging for selected elements; alignment helpers.
+- [x] Keyboard nudging for the selected element (arrows = 0.01″, Shift = 0.1″; front blocks and overlays), Esc to deselect, Delete to remove a selected overlay. Drag already snaps to the safe-area guides. (Dedicated align buttons still optional.)
 - [ ] Optional own-barcode placement (for authors bringing their own ISBN).
 
 ## Out of scope (unless the goal changes)

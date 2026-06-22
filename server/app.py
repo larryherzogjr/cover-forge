@@ -74,10 +74,12 @@ def remove_bg():
 
     try:
         from rembg import remove  # lazy import
-    except Exception:
+    except (Exception, SystemExit):
+        # rembg calls sys.exit(1) (SystemExit, not Exception) when its onnxruntime
+        # import fails, so catch both — a missing/broken runtime must degrade to 503.
         return jsonify(
             error="background removal is not available on this server",
-            detail="install rembg + onnxruntime (run on the GPU box) — see docs/DEPLOYMENT.md",
+            detail="rembg/onnxruntime not importable — install a matching onnxruntime (CPU, or GPU build for this box's CUDA); see docs/DEPLOYMENT.md",
         ), 503
 
     try:

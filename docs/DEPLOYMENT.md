@@ -34,6 +34,11 @@ cd /opt/cover-forge/server
 python3 -m venv ../.venv && . ../.venv/bin/activate
 pip install -r requirements.txt
 pip install "rembg[gpu]"          # background removal; or onnxruntime (CPU), or skip
+# NB: rembg[gpu] pulls onnxruntime-gpu built for a specific CUDA. If you get
+# "libcudart.so.NN: cannot open shared object file", the box's CUDA doesn't
+# match — either install that CUDA runtime, or fall back to CPU:
+#   pip uninstall -y onnxruntime onnxruntime-gpu && pip install onnxruntime
+# (CPU rembg is a few seconds per cover — fine for occasional use.)
 # serve on the LAN like llama.cpp:
 ../.venv/bin/gunicorn -w 2 -b 0.0.0.0:5004 --timeout 120 app:app
 ```

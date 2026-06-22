@@ -1,0 +1,11 @@
+{
+  "name": "cover-forge-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cover Forge static frontend — KDP full-wrap cover tool",
+  "scripts": {
+    "test": "node --test",
+    "check": "for f in src/*.js; do node --check \"$f\"; done"
+  }
+}

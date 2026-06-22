@@ -24,5 +24,8 @@ outputs/
 .idea/
 *.swp
 
+# Claude Code — local, machine-specific overrides (launch.json is shared)
+.claude/settings.local.json
+
 # Env
 .env

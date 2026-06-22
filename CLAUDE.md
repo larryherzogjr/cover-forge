@@ -30,7 +30,7 @@ without reason.
 ## Run / dev commands
 
 ```bash
-# Frontend (any static server; the single file also works from file://)
+# Frontend — ES modules need an HTTP origin (no longer runs from file://)
 cd web && python3 -m http.server 8080      # then open http://localhost:8080
 
 # Backend
@@ -38,33 +38,36 @@ cd server && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 flask --app app run --port 5004 --debug
 
-# Syntax-check the prototype's inline JS before committing changes to it
-python3 - <<'PY'
-import re; s=open('web/index.html').read()
-open('/tmp/f.js','w').write(re.search(r'<script>(.*)</script>', s, re.S).group(1))
-PY
-node --check /tmp/f.js
+# kdp.js unit tests + syntax check (also run by .githooks/pre-commit)
+cd web && node --test            # or: npm test
+cd web && npm run check          # node --check every src/*.js
 ```
 
-## Architecture (current vs target)
+Enable the pre-commit gate once per clone: `git config core.hooksPath .githooks`.
 
-Current: one HTML file. State object `S`, geometry in `dims()`, all drawing in
-`drawCover()`, live preview in `render()`, export functions, and event wiring —
-all inline. Target module split (first refactor task, see `docs/ROADMAP.md`):
+## Architecture
+
+The M0 refactor is done: `web/index.html` is now shell + DOM only and loads
+`src/ui.js` as an ES module. Behavior is identical to the original single-file
+prototype (smoke-tested). Module split:
 
 ```
 web/
-  index.html          # shell + DOM only
+  index.html          # shell + DOM only; <script type="module" src="src/ui.js">
   src/
     kdp.js            # geometry & constants — PURE functions, unit-tested
-    state.js          # the S object + load/save (project JSON)
+    state.js          # the S object (+ load/save project JSON — M3)
     render.js         # drawCover, drawImageFit, text/back/spine, guides, 3D
-    export.js         # PNG now; calls server for PDF
-    ui.js             # event wiring, panels, drag/zoom interactions
+    export.js         # PNG now; calls server for PDF (M1)
+    ui.js             # entry: event wiring, readouts, palette, drag/zoom
     fonts.js          # font list + ensure-loaded-before-export
+  test/kdp.test.js    # Node tests for the pure geometry (KDP_SPEC examples)
+  package.json        # { "type": "module" }, test/check scripts
 ```
 
-Keep `kdp.js` free of DOM/canvas so it can be tested in Node.
+Keep `kdp.js` free of DOM/canvas so it can be tested in Node. Note: ES modules
+require an HTTP origin, so the app no longer opens directly from `file://` — use
+the static server above.
 
 ## Domain invariants — DO NOT regress these
 

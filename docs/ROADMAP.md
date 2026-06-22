@@ -3,13 +3,13 @@
 Tasks are grouped into milestones and ordered by value. Checkboxes are GitHub-
 issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 
-## M0 — Repo & refactor (do first)
+## M0 — Repo & refactor (done)
 
-- [ ] `git init`; commit `web/index.html` prototype as the known-good baseline; push to GitHub.
-- [ ] Add `LICENSE` (owner's choice — MIT is a reasonable default for a personal tool).
-- [ ] Split `index.html` into `src/{kdp,state,render,export,ui,fonts}.js` per `CLAUDE.md`. Behavior unchanged.
-- [ ] Keep `kdp.js` DOM-free (pure geometry). Add Node tests covering the worked examples in `docs/KDP_SPEC.md`.
-- [ ] Add a pre-commit JS syntax check (the `node --check` snippet in `CLAUDE.md`).
+- [x] `git init`; commit `web/index.html` prototype as the known-good baseline; push to GitHub.
+- [x] Add `LICENSE` (owner's choice — MIT is a reasonable default for a personal tool).
+- [x] Split `index.html` into `src/{kdp,state,render,export,ui,fonts}.js` per `CLAUDE.md`. Behavior unchanged.
+- [x] Keep `kdp.js` DOM-free (pure geometry). Add Node tests covering the worked examples in `docs/KDP_SPEC.md` (`web/test/kdp.test.js`).
+- [x] Add a pre-commit JS syntax check + tests (`.githooks/pre-commit`; enable with `git config core.hooksPath .githooks`).
 
 ## M1 — Output correctness (Tier 1)
 

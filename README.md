@@ -43,7 +43,7 @@ flask --app app run --port 5004 --debug
 
 ## License
 
-Add one before publishing (MIT is a fine default for a personal tool).
+[MIT](LICENSE).
 
 ## Disclaimer
 

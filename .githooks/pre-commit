@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit gate for the static frontend: syntax-check every module and run the
+# kdp.js unit tests. Enable with:  git config core.hooksPath .githooks
+set -e
+
+root="$(git rev-parse --show-toplevel)"
+cd "$root/web"
+
+for f in src/*.js; do
+  node --check "$f"
+done
+
+node --test

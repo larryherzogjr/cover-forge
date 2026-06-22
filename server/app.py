@@ -19,10 +19,17 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 # Lock this down to the actual frontend origin in production (see DEPLOYMENT.md).
-CORS(app, resources={r"/api/*": {"origins": os.environ.get("CF_ALLOWED_ORIGIN", "*")}})
+# Expose the custom headers so the browser can read them cross-origin (dev: the
+# static site and the API are on different ports).
+CORS(app, resources={r"/api/*": {
+    "origins": os.environ.get("CF_ALLOWED_ORIGIN", "*"),
+    "expose_headers": ["X-CMYK-Mode", "X-Dim-Match"],
+}})
 
 MAX_UPLOAD_MB = int(os.environ.get("CF_MAX_UPLOAD_MB", "25"))
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
+DPI = 300  # KDP print resolution; must match the frontend render (docs/KDP_SPEC.md)
 
 
 @app.get("/api/health")
@@ -67,30 +74,87 @@ def export_pdf():
     Output: application/pdf — one page, MediaBox = full wrap at exact size,
             TrimBox inset by bleed, image placed at 300 DPI.
 
-    TODO: implement. Simplest correct path with Pillow + img2pdf:
-
-        from PIL import Image
-        img = Image.open(io.BytesIO(png_bytes))
-        # Optional CMYK: img = img.convert('CMYK')  # better: ImageCms with an ICC profile
-        # Place at exact physical size; set DPI so the PDF size is right.
-        pdf_bytes = ...  # img2pdf.convert(..., pagesize=(width_in*72, height_in*72))
-
-    For the strictest PDF/X-1a, post-process with Ghostscript using a PDFX def
-    (see docs/DEPLOYMENT.md notes). Validate output dimensions equal the inputs.
+    Implemented with Pillow + img2pdf (lossless, no recompression of the RGB
+    render). MediaBox is pinned to the exact wrap size; TrimBox is inset by the
+    bleed. cmyk=true converts via an ICC profile when CF_CMYK_ICC is set, else a
+    naive Pillow conversion (flagged in the X-CMYK-Mode response header). For the
+    strictest PDF/X-1a, post-process with Ghostscript — see docs/DEPLOYMENT.md.
     """
+    import img2pdf
+    from PIL import Image, ImageCms
+
     payload = request.get_json(silent=True) or {}
-    b64 = payload.get("png_base64")
+    b64 = payload.get("png_base64") or ""
     if not b64:
         return jsonify(error="png_base64 required"), 400
+    if "," in b64[:64] and b64.lstrip().startswith("data:"):
+        b64 = b64.split(",", 1)[1]  # tolerate a data: URL prefix
     try:
         png_bytes = base64.b64decode(b64)
     except Exception:
         return jsonify(error="png_base64 is not valid base64"), 400
 
-    # --- STUB: not implemented yet. Return 501 so the frontend can show a clear
-    # "PDF export coming" state instead of a silent failure. ---
-    _ = png_bytes
-    return jsonify(error="export-pdf not implemented yet", todo="see server/app.py"), 501
+    try:
+        width_in = float(payload.get("width_in"))
+        height_in = float(payload.get("height_in"))
+    except (TypeError, ValueError):
+        return jsonify(error="width_in and height_in (inches) are required"), 400
+    if not (0 < width_in <= 60 and 0 < height_in <= 60):
+        return jsonify(error="width_in/height_in out of range"), 400
+    bleed_in = float(payload.get("bleed_in", 0.125))
+    want_cmyk = bool(payload.get("cmyk", False))
+
+    try:
+        img = Image.open(io.BytesIO(png_bytes))
+        img.load()
+    except Exception:
+        return jsonify(error="png_base64 did not decode to a valid image"), 400
+
+    # Sanity: the render should be ~300 DPI for the requested wrap. Warn (don't
+    # block) if it's well off — the page size below is authoritative regardless.
+    exp_w, exp_h = round(width_in * DPI), round(height_in * DPI)
+    dim_ok = abs(img.width - exp_w) <= 2 and abs(img.height - exp_h) <= 2
+
+    cmyk_mode = "none"
+    embed_bytes = png_bytes  # default: embed the RGB PNG verbatim (lossless)
+    if want_cmyk:
+        icc = os.environ.get("CF_CMYK_ICC")
+        rgb = img.convert("RGB")
+        if icc and os.path.exists(icc):
+            src = ImageCms.createProfile("sRGB")
+            dst = ImageCms.getOpenProfile(icc)
+            cmyk_img = ImageCms.profileToProfile(rgb, src, dst, outputMode="CMYK")
+            cmyk_mode = "icc"
+        else:
+            cmyk_img = rgb.convert("CMYK")  # naive built-in transform
+            cmyk_mode = "naive"
+        cbuf = io.BytesIO()
+        cmyk_img.save(cbuf, format="TIFF", compression="tiff_lzw")
+        embed_bytes = cbuf.getvalue()
+
+    # MediaBox = exact wrap; TrimBox inset by bleed on all sides; BleedBox = media.
+    layout = img2pdf.get_layout_fun(
+        (img2pdf.in_to_pt(width_in), img2pdf.in_to_pt(height_in))
+    )
+    tb = img2pdf.in_to_pt(bleed_in)
+    out = io.BytesIO()
+    img2pdf.convert(
+        embed_bytes,
+        outputstream=out,
+        layout_fun=layout,
+        trimborder=(tb, tb),
+        bleedborder=(0, 0),
+        title="Cover Forge wrap {:.3f}x{:.3f}in".format(width_in, height_in),
+        nodate=True,  # reproducible output
+    )
+    out.seek(0)
+
+    name = "kdp-wrap_{:.3g}x{:.3g}_{}.pdf".format(width_in, height_in,
+                                                  "cmyk" if want_cmyk else "rgb")
+    resp = send_file(out, mimetype="application/pdf", download_name=name)
+    resp.headers["X-CMYK-Mode"] = cmyk_mode
+    resp.headers["X-Dim-Match"] = "ok" if dim_ok else "off"
+    return resp
 
 
 def _read_image_bytes(req):

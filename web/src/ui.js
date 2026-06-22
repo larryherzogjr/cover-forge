@@ -9,7 +9,7 @@ import {
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
 } from "./kdp.js";
 import { render, drawCover, getPrevScale, rotateBy } from "./render.js";
-import { exportWrap, exportEbook } from "./export.js";
+import { exportWrap, exportEbook, exportPDF } from "./export.js";
 import { ensureFontsLoaded } from "./fonts.js";
 
 const $ = (id) => document.getElementById(id);
@@ -230,6 +230,23 @@ function loadImg(f) {
 /* ---------- export ---------- */
 $("expWrap").onclick = exportWrap;
 $("expEbook").onclick = exportEbook;
+$("expPdf").onclick = async () => {
+  const btn = $("expPdf"), st = $("pdfStatus"), cmyk = $("pdfCmyk").checked;
+  const label = btn.textContent;
+  btn.disabled = true; btn.textContent = "Generating PDF…";
+  st.classList.remove("show");
+  try {
+    const { cmykMode } = await exportPDF({ cmyk });
+    let msg = "Print PDF downloaded.";
+    if (cmyk && cmykMode === "naive") msg += " CMYK used a built-in conversion (no ICC profile on the server) — order a proof before a print run.";
+    else if (cmyk && cmykMode === "icc") msg += " CMYK converted with the server's ICC profile.";
+    setNotice(st, "ok", msg);
+  } catch (e) {
+    setNotice(st, "bad", `PDF export failed: ${e.message}. The PNG wrap above still works fully offline — the PDF needs the Cover Forge API running (see <span class="mono">server/</span>).`);
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+};
 
 /* ---------- image size + position: slider, reset, drag to pan, scroll to zoom ---------- */
 $("scale").addEventListener("input", (e) => { S.imgScale = +e.target.value / 100; $("scaleL").textContent = e.target.value + "%"; rerender(); });

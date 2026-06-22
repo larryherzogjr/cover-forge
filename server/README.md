@@ -6,9 +6,9 @@ Small Flask service for the two features that can't run in the browser.
 
 | Method | Path | Purpose | Status |
 |--------|------|---------|--------|
-| GET  | `/api/health`    | liveness | done (stub) |
+| GET  | `/api/health`    | liveness | done |
 | POST | `/api/remove-bg` | isolate subject (rembg/BiRefNet) | stub: echoes input |
-| POST | `/api/export-pdf`| 300-DPI render -> print PDF | stub: returns 501 |
+| POST | `/api/export-pdf`| 300-DPI render -> print PDF | done (RGB + CMYK) |
 
 See contracts (request/response shapes) in the docstrings in `app.py`.
 
@@ -26,12 +26,14 @@ curl -s http://127.0.0.1:5004/api/health
 - **remove-bg:** lazy-import the model and load it once at module scope; don't
   reload per request. Run on the GPU box with `onnxruntime-gpu`. Pre-warm on
   startup. Return RGBA PNG.
-- **export-pdf:** start simple (Pillow + img2pdf), exact physical page size,
-  TrimBox inset by bleed. CMYK via ImageCms + an ICC profile. PDF/X-1a via
-  Ghostscript only if KDP rejects the simpler output. Validate output dims == the
-  requested wrap dims.
-- **Config via env:** `CF_PORT`, `CF_ALLOWED_ORIGIN`, `CF_MAX_UPLOAD_MB`. Never
-  hardcode origins or secrets.
+- **export-pdf:** done — Pillow + img2pdf, exact physical page size (MediaBox),
+  TrimBox inset by bleed, RGB embedded losslessly. `cmyk:true` converts via
+  `ImageCms` + the `CF_CMYK_ICC` profile when set, else a naive Pillow
+  conversion; the mode is returned in `X-CMYK-Mode` (`icc`/`naive`/`none`) and
+  `X-Dim-Match` flags whether the upload matched `round(in*300)`. PDF/X-1a via
+  Ghostscript remains optional — see `docs/DEPLOYMENT.md`.
+- **Config via env:** `CF_PORT`, `CF_ALLOWED_ORIGIN`, `CF_MAX_UPLOAD_MB`,
+  `CF_CMYK_ICC` (path to a CMYK ICC profile). Never hardcode origins or secrets.
 
 ## Prod
 

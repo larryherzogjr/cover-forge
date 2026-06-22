@@ -64,6 +64,14 @@ model on service start so the first request isn't slow.
 ## PDF / CMYK notes
 
 - The simple path (Pillow + img2pdf) yields a correct-dimension RGB or CMYK PDF.
+  This is implemented in `/api/export-pdf`: MediaBox = exact wrap, TrimBox inset
+  by bleed, RGB embedded losslessly.
+- **CMYK** (`cmyk:true` in the request): if `CF_CMYK_ICC` points to a CMYK ICC
+  profile the server does a proper `ImageCms` sRGB→CMYK transform; otherwise it
+  falls back to Pillow's naive `convert("CMYK")`. The mode is returned in the
+  `X-CMYK-Mode` response header (`icc` | `naive` | `none`) and surfaced to the
+  user. Set `CF_CMYK_ICC=/path/to/USWebCoatedSWOP.icc` (or similar) in the unit
+  file for accurate output.
 - For strict **PDF/X-1a**, post-process with Ghostscript and a PDFX def file:
   `gs -dPDFX -dBATCH -dNOPAUSE -sDEVICE=pdfwrite -sOutputFile=out.pdf PDFX_def.ps in.pdf`
   Embed an appropriate CMYK ICC profile. Only worth it if KDP flags the simpler

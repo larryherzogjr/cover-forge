@@ -11,12 +11,12 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 - [x] Keep `kdp.js` DOM-free (pure geometry). Add Node tests covering the worked examples in `docs/KDP_SPEC.md` (`web/test/kdp.test.js`).
 - [x] Add a pre-commit JS syntax check + tests (`.githooks/pre-commit`; enable with `git config core.hooksPath .githooks`).
 
-## M1 — Output correctness (Tier 1)
+## M1 — Output correctness (Tier 1) — done
 
-- [ ] **Effective-DPI check** on the placed background: compute `nativePx ÷ placedInches`; warn (non-blocking) below 300, hard-warn below 200. Client-side.
-- [ ] **CMYK shift warning**: flag highly saturated fills/text colors that will shift on press; one-line non-blocking notice. Client-side.
-- [ ] **PDF export** via the API: client posts the 300-DPI render + trim/bleed dims; server returns a flattened print PDF (MediaBox = full wrap, TrimBox inset by bleed). See `server/app.py` `/api/export-pdf`.
-- [ ] **CMYK PDF** option: server converts RGB→CMYK with an ICC profile; offer PDF/X-1a via Ghostscript for the strictest path. Document the tradeoff for the user.
+- [x] **Effective-DPI check** on the placed background: compute `nativePx ÷ placedInches`; warn (non-blocking) below 300, hard-warn below 200. Client-side.
+- [x] **CMYK shift warning**: flag highly saturated fills/text colors that will shift on press; one-line non-blocking notice. Client-side.
+- [x] **PDF export** via the API: client posts the 300-DPI render + trim/bleed dims; server returns a flattened print PDF (MediaBox = full wrap, TrimBox inset by bleed). See `server/app.py` `/api/export-pdf`.
+- [x] **CMYK PDF** option: `cmyk:true` converts RGB→CMYK via `ImageCms` + `CF_CMYK_ICC` (or naive fallback, flagged in `X-CMYK-Mode`). PDF/X-1a via Ghostscript documented as the optional strict path (`docs/DEPLOYMENT.md`).
 
 ## M2 — Design parity (Tier 2, all client-side)
 

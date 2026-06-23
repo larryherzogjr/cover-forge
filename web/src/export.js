@@ -43,14 +43,16 @@ export async function exportEbook() {
   const box = { x: 0, y: 0, w: W, h: H };
   drawWrapText(ctx, { ...S.title, size: S.title.size * 1.15 }, box, W / (S.trimW + BLEED), "title");
   drawWrapText(ctx, S.author, box, W / (S.trimW + BLEED), "author");
-  dl(c, `ebook-front_1600x2560.png`);
+  // KDP requires JPEG or TIFF for ebook covers — PNG uploads are rejected. The
+  // ebook always renders on an opaque fillBackground, so dropping alpha is safe.
+  dl(c, `ebook-front_1600x2560.jpg`, "image/jpeg", 0.92);
 }
 
-function dl(canvas, name) {
+function dl(canvas, name, type = "image/png", quality) {
   canvas.toBlob((b) => {
     const u = URL.createObjectURL(b); const a = document.createElement("a");
     a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 2000);
-  }, "image/png");
+  }, type, quality);
 }
 
 // Background removal via the server. Posts an image data URL, returns the

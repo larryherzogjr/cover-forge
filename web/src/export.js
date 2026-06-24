@@ -1,10 +1,11 @@
 // export.js — output deliverables: print-wrap PNG @300 DPI at exact KDP pixel
-// dims, a 1600x2560 ebook front, and a flattened print PDF (RGB or CMYK) via the
-// Flask server (server/app.py /api/export-pdf). Server calls degrade gracefully.
+// dims, a 1600px-wide ebook front (cropped from the same render), and a
+// flattened print PDF (RGB or CMYK) via the Flask server (server/app.py
+// /api/export-pdf). Server calls degrade gracefully.
 
 import { S } from "./state.js";
 import { dims, DPI, BLEED } from "./kdp.js";
-import { drawCover, drawImageFit, drawWrapText, fillBackground } from "./render.js";
+import { drawCover } from "./render.js";
 import { loadFonts } from "./fonts.js";
 
 // Every family the design renders with (spine uses Cormorant Garamond). Exports
@@ -29,23 +30,27 @@ export async function exportWrap() {
   dl(c, `kdp-wrap_${S.trimW}x${S.trimH}_${S.pages}pg_${d.pxW}x${d.pxH}.png`);
 }
 
-// Ebook front cover at the common 1600x2560 storefront size.
+// Ebook front cover. Renders the full wrap through the exact same path as the
+// print export (drawCover) and crops the front TRIM panel, so the ebook is a
+// faithful copy of the print front — same art crop, overlays, and every text
+// block (series/title/subtitle/pull-quote/author), not a hand-rolled subset.
+// Output is 1600px wide at the book's true trim aspect (no distortion); KDP
+// requires JPEG or TIFF for ebook covers (PNG is rejected) and the cover is
+// fully opaque, so dropping alpha is safe.
 export async function exportEbook() {
   await loadFonts(usedFonts());
-  const W = 1600, H = 2560; const c = document.createElement("canvas"); c.width = W; c.height = H;
-  const ctx = c.getContext("2d");
-  fillBackground(ctx, W, H);
-  if (S.img) {
-    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, S.imgOpacity));
-    ctx.globalCompositeOperation = S.imgBlend || "source-over";
-    const es = W / (S.trimW + BLEED); drawImageFit(ctx, S.img, 0, 0, W, H, S.imgScale, S.imgX * es, S.imgY * es); ctx.restore();
-  }
-  const box = { x: 0, y: 0, w: W, h: H };
-  drawWrapText(ctx, { ...S.title, size: S.title.size * 1.15 }, box, W / (S.trimW + BLEED), "title");
-  drawWrapText(ctx, S.author, box, W / (S.trimW + BLEED), "author");
-  // KDP requires JPEG or TIFF for ebook covers — PNG uploads are rejected. The
-  // ebook always renders on an opaque fillBackground, so dropping alpha is safe.
-  dl(c, `ebook-front_1600x2560.jpg`, "image/jpeg", 0.92);
+  const d = dims(S);
+  const W = 1600, scale = W / d.trimW;          // px-per-inch so trim width == 1600
+  const H = Math.round(d.trimH * scale);
+
+  // Render the whole wrap at this scale, then lift out the front trim rectangle.
+  const wrap = document.createElement("canvas");
+  wrap.width = Math.round(d.fullW * scale); wrap.height = Math.round(d.fullH * scale);
+  drawCover(wrap.getContext("2d"), scale, false);
+
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  c.getContext("2d").drawImage(wrap, Math.round(d.frontX * scale), Math.round(d.edge * scale), W, H, 0, 0, W, H);
+  dl(c, `ebook-front_${W}x${H}.jpg`, "image/jpeg", 0.92);
 }
 
 function dl(canvas, name, type = "image/png", quality) {

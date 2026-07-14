@@ -41,6 +41,9 @@ flask --app app run --port 5004 --debug
 # kdp.js unit tests + syntax check (also run by .githooks/pre-commit)
 cd web && node --test            # or: npm test
 cd web && npm run check          # node --check every src/*.js
+
+# API regression tests (uses only the server requirements + unittest)
+cd server && python -m unittest -v
 ```
 
 Enable the pre-commit gate once per clone: `git config core.hooksPath .githooks`.
@@ -96,10 +99,9 @@ covers KDP rejects or that print wrong. Guard them with tests where possible.
 ## Visual identity (preserve it)
 
 Navy ink + brass/gold. Chrome type: Space Grotesk (display), Inter (UI), Space
-Mono (numeric readouts). The cover-design font menu (Playfair, Cormorant, EB
-Garamond, Libre Baskerville, Oswald, Bebas Neue, Montserrat, Archivo Black) is
-for the books themselves and is separate from the app chrome. Don't flatten the
-tool into a generic light/serif template.
+Mono (numeric readouts). The cover-design catalog lives in `web/src/fonts.js`
+and is populated into every text-block menu; it is separate from the app chrome.
+Don't flatten the tool into a generic light/serif template.
 
 ## Definition of done for a change
 

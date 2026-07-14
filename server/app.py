@@ -3,15 +3,15 @@ Cover Forge API — the two features that can't run in the browser:
   POST /api/remove-bg   -> isolate a subject (rembg / BiRefNet)
   POST /api/export-pdf  -> wrap a 300-DPI render into a print-ready PDF
 
-This is a SCAFFOLD. Endpoints define the contract and return sensible stubs so
-the frontend can be wired immediately; fill in the TODOs. Keep heavy model
-imports lazy so the app boots without them during early development.
+The endpoints are production-capable, while heavy background-removal imports
+stay lazy so the app still boots when the optional inference stack is absent.
 
 Run (dev):   flask --app app run --port 5004 --debug
 Run (prod):  gunicorn -w 2 -b 127.0.0.1:5004 app:app   (see deploy/)
 """
 import base64
 import io
+import math
 import os
 
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
@@ -131,7 +131,13 @@ def export_pdf():
         return jsonify(error="width_in and height_in (inches) are required"), 400
     if not (0 < width_in <= 60 and 0 < height_in <= 60):
         return jsonify(error="width_in/height_in out of range"), 400
-    bleed_in = float(payload.get("bleed_in", 0.125))
+    try:
+        bleed_in = float(payload.get("bleed_in", 0.125))
+    except (TypeError, ValueError):
+        return jsonify(error="bleed_in must be a number of inches"), 400
+    max_bleed = min(width_in, height_in) / 2
+    if not math.isfinite(bleed_in) or not (0 <= bleed_in < max_bleed):
+        return jsonify(error="bleed_in must be non-negative and smaller than half the page"), 400
     want_cmyk = bool(payload.get("cmyk", False))
 
     try:

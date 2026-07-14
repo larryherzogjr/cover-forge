@@ -17,13 +17,17 @@ browser-impossible features (background removal, print-grade PDF). Implemented:
   live 2D preview with guides, 3D preview, exact 300-DPI pixel dims.
 - Background image (opacity, blend, pan/zoom) plus solid/gradient fills, palette
   extraction, and **overlay/logo layers**.
+- A curated **18-family cover-font catalog**, shared by every text block and
+  loaded before raster export.
 - Front title/author/subtitle/series/pull-quote and back tagline/bio with full
-  type controls (stroke, tracking, line-height, caps, shadow), **free
+  type controls (stroke, tracking, line-height, caps, shadow, pasteable hex
+  colors), **free
   drag-positioning** + keyboard nudging, spine text, and a back blurb that flows
   around the barcode zone.
 - **Pre-flight** effective-DPI and CMYK-shift warnings.
 - Export: **print PDF** (RGB or CMYK, via the API), print-wrap PNG, ebook front.
-- **Project save/load** (portable JSON) + autosave, and undo/redo.
+- **Project save/load** (portable JSON) + autosave, one-click blank-cover reset,
+  and undo/redo.
 
 > ES modules need an HTTP origin, so the app no longer opens from `file://` —
 > serve `web/` over HTTP (below).
@@ -41,6 +45,9 @@ flask --app app run --port 5004 --debug
 
 # Tests for the pure geometry
 cd web && npm test
+
+# API regression tests
+cd server && python -m unittest -v
 ```
 
 ## Docs

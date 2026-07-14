@@ -10,7 +10,7 @@ import {
   DPI_MIN, DPI_FLOOR,
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
   imageRegion, effectiveDPI, dpiSeverity,
-  hexToRgb, rgbToHsv, cmykRisk, gradientLine, snap,
+  normalizeHex, hexToRgb, rgbToHsv, cmykRisk, gradientLine, snap,
   HC_WRAP, HC_SAFE, HC_HINGE, HC_BARCODE_BOTTOM, HC_PAGE_MIN, HC_PAGE_MAX,
 } from "../src/kdp.js";
 
@@ -94,6 +94,15 @@ test("font sizing is point-based, no double DPI (invariant #1)", () => {
   near(fontPx(72, 300), 300);
   near(fontPx(12, 300), 50);
   near(fontPx(74, 57), 74 / 72 * 57); // ~preview px/in
+});
+
+test("normalizeHex accepts pasted full and shorthand colors", () => {
+  assert.equal(normalizeHex("#C6A75E"), "#c6a75e");
+  assert.equal(normalizeHex(" 0e1a2b "), "#0e1a2b");
+  assert.equal(normalizeHex("#abc"), "#aabbcc");
+  assert.equal(normalizeHex("ABC"), "#aabbcc");
+  assert.equal(normalizeHex("#12345g"), null);
+  assert.equal(normalizeHex(""), null);
 });
 
 test("exported pixel dims == round(full * DPI)", () => {

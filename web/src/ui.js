@@ -3,19 +3,28 @@
 // geometry lives in kdp.js; pixels in render.js; this module connects controls
 // to state and re-renders.
 
-import { S, serialize, restore, AUTOSAVE_KEY } from "./state.js";
+import { S, serialize, restore, resetProject, AUTOSAVE_KEY } from "./state.js";
 import {
   dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
   imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
-  HC_PAGE_MIN, HC_PAGE_MAX,
+  HC_PAGE_MIN, HC_PAGE_MAX, normalizeHex,
 } from "./kdp.js";
 import { render, getPrevScale, rotateBy, pickAt, getHitBox, isBackBlock } from "./render.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
-import { ensureFontsLoaded, loadFonts } from "./fonts.js";
+import { ensureFontsLoaded, loadFonts, populateFontSelect } from "./fonts.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const cv = $("preview");
+
+// All design-text menus share one curated catalog from fonts.js. Populate them
+// before wiring events so the current state remains the selected value.
+[
+  ["tFont", S.title.font], ["subFont", S.subtitle.font],
+  ["aFont", S.author.font], ["serFont", S.series.font],
+  ["pqFont", S.pullquote.font], ["bFont", S.back.font],
+  ["tagFont", S.tagline.font], ["bioFont", S.bio.font],
+].forEach(([id, selected]) => populateFontSelect($(id), selected));
 
 // Single render funnel: redraw the canvas, refresh notices, schedule an autosave.
 function rerender() {
@@ -197,7 +206,7 @@ function renderSwatches() {
   S.palette.forEach((hex) => {
     const s = document.createElement("div"); s.className = "sw"; s.style.background = hex;
     s.title = hex + " — click for title color";
-    s.onclick = () => { S.title.color = hex; $("tColor").value = hex; $("tColorL").textContent = hex; rerender(); };
+    s.onclick = () => { S.title.color = hex; $("tColor").value = hex; $("tColorL").value = hex; rerender(); };
     host.appendChild(s);
   });
 }
@@ -209,8 +218,33 @@ function bindSlider(id, labelId, obj, key, fmt) {
   el.addEventListener("input", sync); sync();
 }
 function bindColor(id, labelId, obj, key) {
-  const el = $(id), lab = $(labelId);
-  el.addEventListener("input", () => { obj[key] = el.value; lab.textContent = el.value; rerender(); });
+  const el = $(id), hex = $(labelId);
+  const markValidity = (valid) => {
+    hex.classList.toggle("invalid", !valid);
+    hex.setAttribute("aria-invalid", valid ? "false" : "true");
+  };
+  el.addEventListener("input", () => {
+    obj[key] = el.value.toLowerCase();
+    hex.value = obj[key];
+    markValidity(true);
+    rerender();
+  });
+  hex.addEventListener("input", () => {
+    const value = normalizeHex(hex.value);
+    markValidity(!!value);
+    if (!value) return;
+    el.value = value;
+    obj[key] = value;
+    rerender();
+  });
+  hex.addEventListener("blur", () => {
+    const value = normalizeHex(hex.value);
+    hex.value = value || obj[key];
+    markValidity(true);
+  });
+  hex.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); hex.blur(); }
+  });
 }
 // Wire a compact optional text block (text/font/size/color/caps) by id prefix.
 function bindTextBlock(prefix, blockKey) {
@@ -348,8 +382,8 @@ $("applyGenre").onclick = () => {
   const g = GENRE[$("genre").value]; if (!g) return;
   S.title.font = g.tFont; $("tFont").value = g.tFont;
   S.author.font = g.aFont; $("aFont").value = g.aFont;
-  S.title.color = g.tColor; $("tColor").value = g.tColor; $("tColorL").textContent = g.tColor;
-  S.author.color = g.aColor; $("aColor").value = g.aColor; $("aColorL").textContent = g.aColor;
+  S.title.color = g.tColor; $("tColor").value = g.tColor; $("tColorL").value = g.tColor;
+  S.author.color = g.aColor; $("aColor").value = g.aColor; $("aColorL").value = g.aColor;
   rerender(); loadFonts([g.tFont, g.aFont]).then(rerender);
 };
 
@@ -585,7 +619,11 @@ book.addEventListener("pointerup", () => { dragging = false; });
 const sv = (id, v) => { const e = $(id); if (e) e.value = v; };
 const svl = (id, labId, v, fmt) => { sv(id, v); const l = $(labId); if (l) l.textContent = fmt ? fmt(v) : v; };
 const schk = (id, b) => { const e = $(id); if (e) e.checked = !!b; };
-const scol = (id, labId, v) => { sv(id, v); const l = $(labId); if (l) l.textContent = v; };
+const scol = (id, labId, v) => {
+  sv(id, v);
+  const l = $(labId);
+  if (l) { l.value = v; l.classList.remove("invalid"); l.setAttribute("aria-invalid", "false"); }
+};
 const sseg = (sel, attr, val) => document.querySelectorAll(sel + " button").forEach((b) => b.classList.toggle("on", b.dataset[attr] === String(val)));
 
 function syncBlock(prefix, key) {
@@ -679,6 +717,40 @@ function projectFileName() {
   return (t || "cover") + ".coverforge.json";
 }
 
+function startNewProject() {
+  const confirmed = window.confirm(
+    "Start a new cover? This clears the current design and its autosave. Save the project first if you want to keep it."
+  );
+  if (!confirmed) return;
+
+  clearTimeout(_saveTimer);
+  clearTimeout(_commitTimer);
+  resetProject();
+
+  $("file").value = "";
+  $("ovFile").value = "";
+  $("projFile").value = "";
+  $("genre").value = "";
+  $("thumb").classList.remove("show");
+  $("thumbImg").removeAttribute("src");
+  cv.style.cursor = "default";
+  renderSwatches();
+  setNotice($("bgRemoveStatus"), "", null);
+
+  syncUI();
+  clearTimeout(_commitTimer);
+  initHistory();
+
+  // Replace the previous autosave immediately so a fast reload cannot restore
+  // the cover that was just cleared. The blank project is small enough that the
+  // normal image-quota fallback is unnecessary here.
+  try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serialize())); }
+  catch (_) { localStorage.removeItem(AUTOSAVE_KEY); }
+
+  setProjStatus("ok", "New blank cover ready.");
+  $("tTitle").focus();
+}
+
 // Apply a parsed project: design fields synchronously, image asynchronously.
 async function applyProject(parsed) {
   const dataUrl = restore(parsed);
@@ -703,6 +775,7 @@ function loadProjectFile(f) {
 }
 $("saveProj").onclick = () => { downloadJSON(serialize(), projectFileName()); setProjStatus("ok", "Project saved to your downloads."); };
 $("loadProj").onclick = () => $("projFile").click();
+$("newProj").onclick = startNewProject;
 $("projFile").onchange = (e) => { const f = e.target.files[0]; if (f) loadProjectFile(f); e.target.value = ""; };
 
 $("undoBtn").onclick = undo;

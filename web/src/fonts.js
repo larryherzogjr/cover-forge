@@ -4,6 +4,46 @@
 // rasterizes a fallback for any face that hasn't loaded yet, so exports must
 // await loadFonts() for the families actually in use.
 
+// One catalog feeds every cover-text menu. Keep this separate from the app
+// chrome families (Space Grotesk / Inter / Space Mono) so adding a design font
+// cannot accidentally restyle the editor itself.
+export const COVER_FONT_GROUPS = [
+  {
+    label: "Serif",
+    families: [
+      "Playfair Display", "Cormorant Garamond", "EB Garamond",
+      "Libre Baskerville", "Lora", "Merriweather", "Crimson Pro",
+      "DM Serif Display", "Cinzel", "Roboto Slab",
+    ],
+  },
+  {
+    label: "Sans / display",
+    families: [
+      "Oswald", "Bebas Neue", "Montserrat", "Archivo Black", "Raleway",
+      "Poppins", "Anton", "League Spartan",
+    ],
+  },
+];
+
+export const COVER_FONTS = COVER_FONT_GROUPS.flatMap((group) => group.families);
+
+export function populateFontSelect(select, selected) {
+  if (!select) return;
+  select.replaceChildren();
+  for (const group of COVER_FONT_GROUPS) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    for (const family of group.families) {
+      const option = document.createElement("option");
+      option.value = family;
+      option.textContent = family;
+      optgroup.appendChild(option);
+    }
+    select.appendChild(optgroup);
+  }
+  select.value = selected;
+}
+
 // Resolve once the browser reports all linked faces are ready, so the first
 // render (and any canvas export) draws with real type, not a fallback.
 export function ensureFontsLoaded() {

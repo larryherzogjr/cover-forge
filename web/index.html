@@ -6,7 +6,8 @@
 <title>Cover Forge — KDP full-wrap cover tool</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;700;900&family=Cormorant+Garamond:wght@500;600;700&family=EB+Garamond:wght@400;600&family=Libre+Baskerville:wght@400;700&family=Oswald:wght@400;600;700&family=Bebas+Neue&family=Montserrat:wght@500;700;900&family=Archivo+Black&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:wght@500;600;700&family=Crimson+Pro:wght@400;600;700&family=DM+Serif+Display&family=EB+Garamond:wght@400;600;700&family=League+Spartan:wght@400;600;700;900&family=Libre+Baskerville:wght@400;700&family=Lora:wght@400;600;700&family=Merriweather:wght@400;700&family=Montserrat:wght@500;700;900&family=Oswald:wght@400;600;700&family=Playfair+Display:wght@400;700;900&family=Poppins:wght@400;600;700;900&family=Raleway:wght@400;600;700;900&family=Roboto+Slab:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --ink:#0e1a2b; --ink-2:#15273e; --ink-3:#1d3251; --raised:#22395a;
@@ -88,6 +89,8 @@
   input[type=color]{width:38px;height:30px;padding:2px;border-radius:6px;background:var(--ink-2);border:1px solid var(--line);cursor:pointer}
   .colorrow{display:flex;align-items:center;gap:9px}
   .colorrow .mono{font-size:11px;color:var(--muted)}
+  input.hexcode{width:88px;flex:none;padding:6px 8px;font-size:11px;color:var(--text);text-transform:lowercase}
+  input.hexcode.invalid{border-color:var(--danger);box-shadow:0 0 0 3px rgba(217,138,111,.12)}
 
   .readout{background:var(--ink-2);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
   .readout .line{display:flex;justify-content:space-between;align-items:baseline;
@@ -189,6 +192,7 @@
   <div class="panel left">
     <div class="grp">
       <p class="eyebrow">Project</p>
+      <button class="btn primary" id="newProj">New cover</button>
       <div class="row" style="margin-bottom:10px">
         <button class="btn ghost" id="undoBtn" style="margin-bottom:0" disabled>↶ Undo</button>
         <button class="btn ghost" id="redoBtn" style="margin-bottom:0" disabled>↷ Redo</button>
@@ -199,7 +203,7 @@
       </div>
       <input type="file" id="projFile" accept=".json,application/json" hidden>
       <div class="notice" id="projStatus"></div>
-      <p class="mini" style="margin-top:8px">Saves the full design + image to a portable <span class="mono">.coverforge.json</span> file. Work also auto-saves in this browser and restores on reload.</p>
+      <p class="mini" style="margin-top:8px">New cover clears the editor and replaces its autosave. Save first to keep the current design as a portable <span class="mono">.coverforge.json</span> file.</p>
     </div>
 
     <div class="grp">
@@ -312,11 +316,11 @@
         <button data-bg="gradient">Gradient</button>
       </div>
       <div id="solidWrap" style="margin-top:10px">
-        <div class="colorrow"><input type="color" id="bgColor" value="#141414"><span class="mono" id="bgColorL">#141414</span><span class="mini" style="margin-left:auto">fill color</span></div>
+        <div class="colorrow"><input type="color" id="bgColor" value="#141414"><input type="text" class="hexcode mono" id="bgColorL" value="#141414" maxlength="7" spellcheck="false" aria-label="Fill hex color" title="Paste #RRGGBB or #RGB"><span class="mini" style="margin-left:auto">fill color</span></div>
       </div>
       <div id="gradWrap" style="display:none;margin-top:10px">
-        <div class="colorrow"><input type="color" id="gradFrom" value="#1d3251"><span class="mono" id="gradFromL">#1d3251</span><span class="mini" style="margin-left:auto">from</span></div>
-        <div class="colorrow" style="margin-top:8px"><input type="color" id="gradTo" value="#0e1a2b"><span class="mono" id="gradToL">#0e1a2b</span><span class="mini" style="margin-left:auto">to</span></div>
+        <div class="colorrow"><input type="color" id="gradFrom" value="#1d3251"><input type="text" class="hexcode mono" id="gradFromL" value="#1d3251" maxlength="7" spellcheck="false" aria-label="Gradient start hex color" title="Paste #RRGGBB or #RGB"><span class="mini" style="margin-left:auto">from</span></div>
+        <div class="colorrow" style="margin-top:8px"><input type="color" id="gradTo" value="#0e1a2b"><input type="text" class="hexcode mono" id="gradToL" value="#0e1a2b" maxlength="7" spellcheck="false" aria-label="Gradient end hex color" title="Paste #RRGGBB or #RGB"><span class="mini" style="margin-left:auto">to</span></div>
         <label class="fld" style="margin-top:10px"><span>Angle <b id="gradAngleL" class="mono">90°</b></span><input type="range" id="gradAngle" min="0" max="360" value="90"></label>
       </div>
       <p class="mini" style="margin-top:8px">Solid or gradient fill behind everything — make a typographic cover with no image at all.</p>
@@ -381,20 +385,17 @@
       <p class="eyebrow">Title</p>
       <label class="fld"><textarea id="tTitle" rows="2" placeholder="Your Title">The Purest Gospel</textarea></label>
       <label class="fld">
-        <select id="tFont" data-target="title">
-          <optgroup label="Serif"><option>Playfair Display</option><option>Cormorant Garamond</option><option>EB Garamond</option><option>Libre Baskerville</option></optgroup>
-          <optgroup label="Sans / display"><option>Oswald</option><option>Bebas Neue</option><option>Montserrat</option><option>Archivo Black</option></optgroup>
-        </select>
+        <select id="tFont" data-target="title"></select>
       </label>
       <label class="fld"><span>Size <b id="tSizeL" class="mono"></b></span><input type="range" id="tSize" min="24" max="150" value="74"></label>
       <label class="fld"><span>Vertical <b id="tYL" class="mono"></b></span><input type="range" id="tY" min="6" max="92" value="20"></label>
-      <div class="colorrow"><input type="color" id="tColor" value="#f4efe3"><span class="mono" id="tColorL">#f4efe3</span>
+      <div class="colorrow"><input type="color" id="tColor" value="#f4efe3"><input type="text" class="hexcode mono" id="tColorL" value="#f4efe3" maxlength="7" spellcheck="false" aria-label="Title hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tCaps"> all caps</label></div>
       <div class="row" style="margin-top:11px">
         <label class="fld"><span>Letter-spacing <b id="tLsL" class="mono">0</b></span><input type="range" id="tLs" min="-2" max="12" step="0.5" value="0"></label>
         <label class="fld"><span>Line-height <b id="tLhL" class="mono">1.12</b></span><input type="range" id="tLh" min="0.8" max="2" step="0.02" value="1.12"></label>
       </div>
-      <div class="colorrow"><input type="color" id="tStrokeC" value="#0e1a2b"><span class="mono" id="tStrokeCL">#0e1a2b</span>
+      <div class="colorrow"><input type="color" id="tStrokeC" value="#0e1a2b"><input type="text" class="hexcode mono" id="tStrokeCL" value="#0e1a2b" maxlength="7" spellcheck="false" aria-label="Title outline hex color" title="Paste #RRGGBB or #RGB">
         <span class="mini" style="margin-left:auto">outline</span></div>
       <label class="fld" style="margin-top:9px"><span>Outline width <b id="tStrokeWL" class="mono">0 pt</b></span><input type="range" id="tStrokeW" min="0" max="8" step="0.5" value="0"></label>
       <label class="gtog" style="width:100%;justify-content:flex-start"><input type="checkbox" id="tShadow" checked> drop shadow</label>
@@ -412,13 +413,10 @@
       <p class="eyebrow">Subtitle <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
       <label class="fld"><textarea id="subText" rows="2" placeholder="Optional subtitle"></textarea></label>
       <label class="fld">
-        <select id="subFont">
-          <optgroup label="Serif"><option>Playfair Display</option><option selected>Cormorant Garamond</option><option>EB Garamond</option><option>Libre Baskerville</option></optgroup>
-          <optgroup label="Sans / display"><option>Oswald</option><option>Bebas Neue</option><option>Montserrat</option><option>Archivo Black</option></optgroup>
-        </select>
+        <select id="subFont"></select>
       </label>
       <label class="fld"><span>Size <b id="subSizeL" class="mono"></b></span><input type="range" id="subSize" min="10" max="80" value="28"></label>
-      <div class="colorrow"><input type="color" id="subColor" value="#e9e3d4"><span class="mono" id="subColorL">#e9e3d4</span>
+      <div class="colorrow"><input type="color" id="subColor" value="#e9e3d4"><input type="text" class="hexcode mono" id="subColorL" value="#e9e3d4" maxlength="7" spellcheck="false" aria-label="Subtitle hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="subCaps"> all caps</label></div>
     </div>
 
@@ -426,19 +424,17 @@
       <p class="eyebrow">Author</p>
       <label class="fld"><input type="text" id="aText" value="Larry Herzog Jr."></label>
       <label class="fld">
-        <select id="aFont" data-target="author">
-          <option>Montserrat</option><option>Oswald</option><option selected>Cormorant Garamond</option><option>EB Garamond</option><option>Bebas Neue</option>
-        </select>
+        <select id="aFont" data-target="author"></select>
       </label>
       <label class="fld"><span>Size <b id="aSizeL" class="mono"></b></span><input type="range" id="aSize" min="14" max="64" value="30"></label>
       <label class="fld"><span>Vertical <b id="aYL" class="mono"></b></span><input type="range" id="aY" min="6" max="96" value="90"></label>
-      <div class="colorrow"><input type="color" id="aColor" value="#c6a75e"><span class="mono" id="aColorL">#c6a75e</span>
+      <div class="colorrow"><input type="color" id="aColor" value="#c6a75e"><input type="text" class="hexcode mono" id="aColorL" value="#c6a75e" maxlength="7" spellcheck="false" aria-label="Author hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="aCaps"> all caps</label></div>
       <div class="row" style="margin-top:11px">
         <label class="fld"><span>Letter-spacing <b id="aLsL" class="mono">0</b></span><input type="range" id="aLs" min="-1" max="12" step="0.5" value="0"></label>
         <label class="fld"><span>Outline width <b id="aStrokeWL" class="mono">0 pt</b></span><input type="range" id="aStrokeW" min="0" max="6" step="0.5" value="0"></label>
       </div>
-      <div class="colorrow"><input type="color" id="aStrokeC" value="#0e1a2b"><span class="mono" id="aStrokeCL">#0e1a2b</span>
+      <div class="colorrow"><input type="color" id="aStrokeC" value="#0e1a2b"><input type="text" class="hexcode mono" id="aStrokeCL" value="#0e1a2b" maxlength="7" spellcheck="false" aria-label="Author outline hex color" title="Paste #RRGGBB or #RGB">
         <span class="mini" style="margin-left:auto">outline color</span></div>
     </div>
 
@@ -446,13 +442,10 @@
       <p class="eyebrow">Series <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
       <label class="fld"><input type="text" id="serText" placeholder="Series / collection name"></label>
       <label class="fld">
-        <select id="serFont">
-          <optgroup label="Sans / display"><option selected>Montserrat</option><option>Oswald</option><option>Bebas Neue</option><option>Archivo Black</option></optgroup>
-          <optgroup label="Serif"><option>Cormorant Garamond</option><option>EB Garamond</option><option>Playfair Display</option><option>Libre Baskerville</option></optgroup>
-        </select>
+        <select id="serFont"></select>
       </label>
       <label class="fld"><span>Size <b id="serSizeL" class="mono"></b></span><input type="range" id="serSize" min="8" max="48" value="16"></label>
-      <div class="colorrow"><input type="color" id="serColor" value="#c6a75e"><span class="mono" id="serColorL">#c6a75e</span>
+      <div class="colorrow"><input type="color" id="serColor" value="#c6a75e"><input type="text" class="hexcode mono" id="serColorL" value="#c6a75e" maxlength="7" spellcheck="false" aria-label="Series hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="serCaps" checked> all caps</label></div>
     </div>
 
@@ -460,20 +453,17 @@
       <p class="eyebrow">Pull-quote <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
       <label class="fld"><textarea id="pqText" rows="2" placeholder="“An endorsement or tagline…”"></textarea></label>
       <label class="fld">
-        <select id="pqFont">
-          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
-          <optgroup label="Sans / display"><option>Montserrat</option><option>Oswald</option></optgroup>
-        </select>
+        <select id="pqFont"></select>
       </label>
       <label class="fld"><span>Size <b id="pqSizeL" class="mono"></b></span><input type="range" id="pqSize" min="9" max="40" value="15"></label>
-      <div class="colorrow"><input type="color" id="pqColor" value="#d9c9a3"><span class="mono" id="pqColorL">#d9c9a3</span>
+      <div class="colorrow"><input type="color" id="pqColor" value="#d9c9a3"><input type="text" class="hexcode mono" id="pqColorL" value="#d9c9a3" maxlength="7" spellcheck="false" aria-label="Pull-quote hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="pqCaps"> all caps</label></div>
     </div>
 
     <div class="grp">
       <p class="eyebrow">Spine</p>
       <label class="fld"><input type="text" id="sText" value="The Purest Gospel — Herzog"></label>
-      <div class="colorrow"><input type="color" id="sColor" value="#f4efe3"><span class="mono" id="sColorL">#f4efe3</span>
+      <div class="colorrow"><input type="color" id="sColor" value="#f4efe3"><input type="text" class="hexcode mono" id="sColorL" value="#f4efe3" maxlength="7" spellcheck="false" aria-label="Spine hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="sFlip"> flip 180°</label></div>
     </div>
 
@@ -481,10 +471,7 @@
       <p class="eyebrow">Back cover</p>
       <label class="fld"><textarea id="bText" rows="7" placeholder="Back-cover blurb… (blank line = new paragraph)"></textarea></label>
       <label class="fld">
-        <select id="bFont">
-          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
-          <optgroup label="Sans"><option>Montserrat</option><option>Oswald</option></optgroup>
-        </select>
+        <select id="bFont"></select>
       </label>
       <div class="row">
         <label class="fld"><span>Size <b id="bSizeL" class="mono"></b></span><input type="range" id="bSize" min="9" max="30" value="16"></label>
@@ -492,7 +479,7 @@
       </div>
       <label class="fld"><span>Line-height <b id="bLhL" class="mono">1.34</b></span><input type="range" id="bLh" min="1" max="2.2" step="0.02" value="1.34"></label>
       <div class="seg" id="bAlignSeg"><button class="on" data-align="left">Left</button><button data-align="center">Center</button></div>
-      <div class="colorrow" style="margin-top:10px"><input type="color" id="bColor" value="#e9e3d4"><span class="mono" id="bColorL">#e9e3d4</span></div>
+      <div class="colorrow" style="margin-top:10px"><input type="color" id="bColor" value="#e9e3d4"><input type="text" class="hexcode mono" id="bColorL" value="#e9e3d4" maxlength="7" spellcheck="false" aria-label="Back-cover hex color" title="Paste #RRGGBB or #RGB"></div>
       <p class="mini" style="margin-top:8px">Text auto-flows around the ISBN / barcode keep-clear zone in the lower-right of the back cover — no manual nudging needed.</p>
     </div>
 
@@ -500,13 +487,10 @@
       <p class="eyebrow">Back tagline <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
       <label class="fld"><textarea id="tagText" rows="2" placeholder="A one-line hook for the back"></textarea></label>
       <label class="fld">
-        <select id="tagFont">
-          <optgroup label="Sans / display"><option selected>Montserrat</option><option>Oswald</option><option>Bebas Neue</option><option>Archivo Black</option></optgroup>
-          <optgroup label="Serif"><option>Cormorant Garamond</option><option>EB Garamond</option><option>Playfair Display</option><option>Libre Baskerville</option></optgroup>
-        </select>
+        <select id="tagFont"></select>
       </label>
       <label class="fld"><span>Size <b id="tagSizeL" class="mono"></b></span><input type="range" id="tagSize" min="9" max="44" value="18"></label>
-      <div class="colorrow"><input type="color" id="tagColor" value="#c6a75e"><span class="mono" id="tagColorL">#c6a75e</span>
+      <div class="colorrow"><input type="color" id="tagColor" value="#c6a75e"><input type="text" class="hexcode mono" id="tagColorL" value="#c6a75e" maxlength="7" spellcheck="false" aria-label="Back-tagline hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="tagCaps"> all caps</label></div>
     </div>
 
@@ -514,13 +498,10 @@
       <p class="eyebrow">Author bio <span class="mini" style="text-transform:none;letter-spacing:0">· optional, drag to place</span></p>
       <label class="fld"><textarea id="bioText" rows="3" placeholder="Short author bio for the back"></textarea></label>
       <label class="fld">
-        <select id="bioFont">
-          <optgroup label="Serif"><option selected>EB Garamond</option><option>Cormorant Garamond</option><option>Libre Baskerville</option><option>Playfair Display</option></optgroup>
-          <optgroup label="Sans"><option>Montserrat</option><option>Oswald</option></optgroup>
-        </select>
+        <select id="bioFont"></select>
       </label>
       <label class="fld"><span>Size <b id="bioSizeL" class="mono"></b></span><input type="range" id="bioSize" min="8" max="24" value="12"></label>
-      <div class="colorrow"><input type="color" id="bioColor" value="#cdbf9f"><span class="mono" id="bioColorL">#cdbf9f</span>
+      <div class="colorrow"><input type="color" id="bioColor" value="#cdbf9f"><input type="text" class="hexcode mono" id="bioColorL" value="#cdbf9f" maxlength="7" spellcheck="false" aria-label="Author-bio hex color" title="Paste #RRGGBB or #RGB">
         <label class="gtog" style="margin-left:auto"><input type="checkbox" id="bioCaps"> all caps</label></div>
     </div>
 

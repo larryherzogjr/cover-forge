@@ -129,6 +129,14 @@ export const dpiSeverity = (dpi) =>
 export const CMYK_SAT_RISK = 0.7; // HSV saturation at/above which we flag
 export const CMYK_VAL_RISK = 0.5; // ...combined with this brightness
 
+// Normalize pasted color values for the editor. Accept the common #RRGGBB,
+// RRGGBB, #RGB, and RGB forms; return null without guessing on invalid input.
+export function normalizeHex(value) {
+  let h = String(value ?? "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(h)) h = h.split("").map((c) => c + c).join("");
+  return /^[0-9a-f]{6}$/i.test(h) ? "#" + h.toLowerCase() : null;
+}
+
 export function hexToRgb(hex) {
   let h = String(hex).trim().replace(/^#/, "");
   if (h.length === 3) h = h.split("").map((c) => c + c).join("");

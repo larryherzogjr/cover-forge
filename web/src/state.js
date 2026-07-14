@@ -48,6 +48,23 @@ export const S = {
   selected: null, // selection token: a block id, "overlay:<id>", or null
 };
 
+// A new cover keeps the editor's useful format/style defaults, but starts with
+// no book-specific copy or artwork. Capture it once so reset cannot inherit
+// fields from the project that happened to be open when the button was clicked.
+const NEW_PROJECT_STATE = JSON.parse(JSON.stringify(S));
+NEW_PROJECT_STATE.title.text = "";
+NEW_PROJECT_STATE.author.text = "";
+NEW_PROJECT_STATE.spine.text = "";
+NEW_PROJECT_STATE.back.text = "";
+
+export function resetProject() {
+  deepMerge(S, JSON.parse(JSON.stringify(NEW_PROJECT_STATE)));
+  S.img = null;
+  S.palette = [];
+  S.overlays = [];
+  S.selected = null;
+}
+
 /* ---------- project save / load (portable JSON) ---------- */
 
 export const PROJECT_VERSION = 1;

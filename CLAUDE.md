@@ -8,9 +8,9 @@ architecture evolves. Read `HANDOFF.md` once for full context; read
 
 Cover Forge is a self-hosted, KDP full-wrap book-cover generator. It exists so
 the owner (a prolific self-publisher) can stop paying per-cover SaaS fees. The
-working prototype is a single self-contained file at `web/index.html` — it is
-the **reference implementation**, not the final architecture. Everything it does
-must keep working after refactors.
+original prototype was a single self-contained `web/index.html`; its behavior
+remains the reference, but the live implementation is now the ES-module split
+documented below. Everything it did must keep working after further refactors.
 
 Primary user is the repo owner: deep IT background, runs Flask apps on Proxmox
 behind nginx with systemd, has a local GPU box for inference. Deployment should
@@ -62,9 +62,12 @@ web/
     state.js          # the S object (+ load/save project JSON — M3)
     render.js         # drawCover, drawImageFit, text/back/spine, guides, 3D
     export.js         # PNG now; calls server for PDF (M1)
+    preflight.js      # PURE safe-area/barcode/color checks
     ui.js             # entry: event wiring, readouts, palette, drag/zoom
     fonts.js          # font list + ensure-loaded-before-export
   test/kdp.test.js    # Node tests for the pure geometry (KDP_SPEC examples)
+  test/state.test.js  # project reset/validation/restore tests
+  test/preflight.test.js # print-safety checks over recorded render bounds
   package.json        # { "type": "module" }, test/check scripts
 ```
 
@@ -108,4 +111,5 @@ Don't flatten the tool into a generic light/serif template.
 - Prototype's existing features still work (manual smoke test the export).
 - `kdp.js` changes have Node tests.
 - No new console errors; fonts loaded before any canvas export.
+- Project/API boundary changes have malformed-input regression tests.
 - `docs/` updated if behavior or geometry changed.

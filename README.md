@@ -24,7 +24,8 @@ browser-impossible features (background removal, print-grade PDF). Implemented:
   colors), **free
   drag-positioning** + keyboard nudging, spine text, and a back blurb that flows
   around the barcode zone.
-- **Pre-flight** effective-DPI and CMYK-shift warnings.
+- **Pre-flight** effective-DPI and CMYK-shift warnings plus rendered safe-area
+  and barcode-zone collision checks.
 - Export: **print PDF** (RGB or CMYK, via the API), print-wrap PNG, ebook front.
 - **Project save/load** (portable JSON) + autosave, one-click blank-cover reset,
   and undo/redo.
@@ -43,12 +44,17 @@ cd server && python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 flask --app app run --port 5004 --debug
 
-# Tests for the pure geometry
+# Frontend geometry/state/pre-flight tests + syntax checks
 cd web && npm test
+cd web && npm run check
 
 # API regression tests
 cd server && python -m unittest -v
 ```
+
+There is no frontend build step. The checked-in ES modules are served directly.
+Core Python dependency versions are constrained by `server/constraints.txt`;
+GPU-specific rembg/onnx versions remain host-dependent.
 
 ## Docs
 

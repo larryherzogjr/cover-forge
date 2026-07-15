@@ -120,7 +120,8 @@ field, with a prominent warning to confirm + order a proof before printing.
 
 - Placed background's effective DPI >= 300 (native px ÷ placed inches).
 - All text inside the safe rectangles.
-- Nothing in the barcode keep-clear box.
+- No draggable text or overlay layers in the barcode keep-clear box (the back
+  blurb flows around it automatically).
 - Spine text only if pages >= ~100.
 - Exported pixel dims == `round(fullWidth*300) × round(fullHeight*300)`.
 - Remember RGB→CMYK shift on press (esp. saturated navy/gold).

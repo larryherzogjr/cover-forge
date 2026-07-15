@@ -28,15 +28,19 @@ curl -s http://127.0.0.1:5004/api/health
   with a clear message if rembg/onnxruntime aren't installed (the frontend
   degrades gracefully). rembg is heavy and commented out of `requirements.txt`;
   install it on the GPU box with `onnxruntime-gpu` and pre-warm on startup.
-- **export-pdf:** done — Pillow + img2pdf, exact physical page size (MediaBox),
-  TrimBox inset by bleed, RGB embedded losslessly. `cmyk:true` converts via
+- **export-pdf:** done — multipart upload (`image` plus dimensions/inset fields;
+  legacy base64 JSON remains accepted), Pillow + img2pdf, exact physical page
+  size (MediaBox), TrimBox inset to the paperback trim or hardcover board edge,
+  RGB embedded losslessly. `cmyk:true` converts via
   `ImageCms` + the `CF_CMYK_ICC` profile when set, else a naive Pillow
   conversion; the mode is returned in `X-CMYK-Mode` (`icc`/`naive`/`none`) and
   `X-Dim-Match` flags whether the upload matched `round(in*300)`. PDF/X-1a via
   Ghostscript remains optional — see `docs/DEPLOYMENT.md`.
-- **Config via env:** `CF_PORT`, `CF_ALLOWED_ORIGIN`, `CF_MAX_UPLOAD_MB`,
+- **Config via env:** `CF_PORT`, `CF_ALLOWED_ORIGIN`, `CF_MAX_UPLOAD_MB` (64 MB
+  default),
   `CF_CMYK_ICC` (path to a CMYK ICC profile), `CF_REMBG_MODEL` (rembg model
-  name). Never hardcode origins or secrets.
+  name), and `CF_WEB_DIR` (unset = adjacent `web/`; empty = API-only). Never
+  hardcode origins or secrets.
 
 ## Prod
 

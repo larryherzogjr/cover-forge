@@ -26,7 +26,7 @@ CORS(app, resources={r"/api/*": {
     "expose_headers": ["X-CMYK-Mode", "X-Dim-Match"],
 }})
 
-MAX_UPLOAD_MB = int(os.environ.get("CF_MAX_UPLOAD_MB", "25"))
+MAX_UPLOAD_MB = int(os.environ.get("CF_MAX_UPLOAD_MB", "64"))
 app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
 
 DPI = 300  # KDP print resolution; must match the frontend render (docs/KDP_SPEC.md)
@@ -35,13 +35,32 @@ DPI = 300  # KDP print resolution; must match the frontend render (docs/KDP_SPEC
 # runs on one port/origin with no separate web server (set CF_WEB_DIR to override,
 # or to "" to disable and run API-only behind nginx). See docs/DEPLOYMENT.md.
 _default_web = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "web")
-WEB_DIR = os.path.abspath(os.environ.get("CF_WEB_DIR", _default_web))
-SERVE_WEB = bool(WEB_DIR) and os.path.isdir(WEB_DIR)
+
+
+def _resolve_web_dir(value):
+    """Resolve the optional static root without turning an empty setting into
+    the process working directory. ``CF_WEB_DIR=`` explicitly disables static
+    serving; an unset variable keeps the adjacent ``web/`` default."""
+    if value is None:
+        value = _default_web
+    value = value.strip()
+    if not value:
+        return None
+    return os.path.abspath(os.path.expanduser(value))
+
+
+WEB_DIR = _resolve_web_dir(os.environ.get("CF_WEB_DIR"))
+SERVE_WEB = WEB_DIR is not None and os.path.isdir(WEB_DIR)
 
 
 @app.get("/api/health")
 def health():
     return jsonify(status="ok", service="cover-forge-api", version="0.1.0")
+
+
+@app.errorhandler(413)
+def upload_too_large(_error):
+    return jsonify(error="upload exceeds the configured {} MB limit".format(MAX_UPLOAD_MB)), 413
 
 
 _REMBG_SESSION = None  # cached model session (loaded once, lazily)
@@ -93,36 +112,44 @@ def remove_bg():
 @app.post("/api/export-pdf")
 def export_pdf():
     """
-    Input (JSON):
+    Input (preferred): multipart/form-data with a PNG field named ``image`` and
+      width_in, height_in, trim_inset_in, and cmyk form fields.
+
+    Backward-compatible JSON:
       {
         "png_base64": "<full-resolution 300-DPI wrap PNG, no data: prefix>",
         "width_in":  12.745,      # full wrap width  (inches)
         "height_in": 9.25,        # full wrap height (inches)
-        "bleed_in":  0.125,
+        "bleed_in":  0.125,     # alias for trim_inset_in
         "cmyk":      false        # true -> convert to CMYK (needs ICC profile)
       }
     Output: application/pdf — one page, MediaBox = full wrap at exact size,
-            TrimBox inset by bleed, image placed at 300 DPI.
+            TrimBox inset to the physical cover edge, image placed at 300 DPI.
 
     Implemented with Pillow + img2pdf (lossless, no recompression of the RGB
     render). MediaBox is pinned to the exact wrap size; TrimBox is inset by the
-    bleed. cmyk=true converts via an ICC profile when CF_CMYK_ICC is set, else a
+    paperback bleed or hardcover turn-in. cmyk=true converts via an ICC profile
+    when CF_CMYK_ICC is set, else a
     naive Pillow conversion (flagged in the X-CMYK-Mode response header). For the
     strictest PDF/X-1a, post-process with Ghostscript — see docs/DEPLOYMENT.md.
     """
     import img2pdf
     from PIL import Image, ImageCms
 
-    payload = request.get_json(silent=True) or {}
-    b64 = payload.get("png_base64") or ""
-    if not b64:
-        return jsonify(error="png_base64 required"), 400
-    if "," in b64[:64] and b64.lstrip().startswith("data:"):
-        b64 = b64.split(",", 1)[1]  # tolerate a data: URL prefix
-    try:
-        png_bytes = base64.b64decode(b64)
-    except Exception:
-        return jsonify(error="png_base64 is not valid base64"), 400
+    if "image" in request.files:
+        payload = request.form
+        png_bytes = request.files["image"].read()
+    else:
+        payload = request.get_json(silent=True) or {}
+        b64 = payload.get("png_base64") or ""
+        if not b64:
+            return jsonify(error="image file or png_base64 required"), 400
+        if "," in b64[:64] and b64.lstrip().startswith("data:"):
+            b64 = b64.split(",", 1)[1]  # tolerate a data: URL prefix
+        try:
+            png_bytes = base64.b64decode(b64, validate=True)
+        except Exception:
+            return jsonify(error="png_base64 is not valid base64"), 400
 
     try:
         width_in = float(payload.get("width_in"))
@@ -132,19 +159,19 @@ def export_pdf():
     if not (0 < width_in <= 60 and 0 < height_in <= 60):
         return jsonify(error="width_in/height_in out of range"), 400
     try:
-        bleed_in = float(payload.get("bleed_in", 0.125))
+        trim_inset_in = float(payload.get("trim_inset_in", payload.get("bleed_in", 0.125)))
     except (TypeError, ValueError):
-        return jsonify(error="bleed_in must be a number of inches"), 400
-    max_bleed = min(width_in, height_in) / 2
-    if not math.isfinite(bleed_in) or not (0 <= bleed_in < max_bleed):
-        return jsonify(error="bleed_in must be non-negative and smaller than half the page"), 400
-    want_cmyk = bool(payload.get("cmyk", False))
+        return jsonify(error="trim_inset_in must be a number of inches"), 400
+    max_inset = min(width_in, height_in) / 2
+    if not math.isfinite(trim_inset_in) or not (0 <= trim_inset_in < max_inset):
+        return jsonify(error="trim_inset_in must be non-negative and smaller than half the page"), 400
+    want_cmyk = _as_bool(payload.get("cmyk", False))
 
     try:
         img = Image.open(io.BytesIO(png_bytes))
         img.load()
     except Exception:
-        return jsonify(error="png_base64 did not decode to a valid image"), 400
+        return jsonify(error="uploaded data did not decode to a valid image"), 400
 
     # Sanity: the render should be ~300 DPI for the requested wrap. Warn (don't
     # block) if it's well off — the page size below is authoritative regardless.
@@ -152,7 +179,7 @@ def export_pdf():
     dim_ok = abs(img.width - exp_w) <= 2 and abs(img.height - exp_h) <= 2
 
     cmyk_mode = "none"
-    embed_bytes = png_bytes  # default: embed the RGB PNG verbatim (lossless)
+    embed_bytes = png_bytes  # default: embed an RGB PNG losslessly
     if want_cmyk:
         icc = os.environ.get("CF_CMYK_ICC")
         rgb = img.convert("RGB")
@@ -167,12 +194,19 @@ def export_pdf():
         cbuf = io.BytesIO()
         cmyk_img.save(cbuf, format="TIFF", compression="tiff_lzw")
         embed_bytes = cbuf.getvalue()
+    elif img.mode not in ("RGB", "L"):
+        # Browser canvases encode PNGs as RGBA even after an opaque background
+        # fill. Strip that unused alpha channel so img2pdf does not create a
+        # second full-page soft-mask image.
+        rgb_buf = io.BytesIO()
+        img.convert("RGB").save(rgb_buf, format="PNG")
+        embed_bytes = rgb_buf.getvalue()
 
-    # MediaBox = exact wrap; TrimBox inset by bleed on all sides; BleedBox = media.
+    # MediaBox = exact wrap; TrimBox inset to the physical cover edge; BleedBox = media.
     layout = img2pdf.get_layout_fun(
         (img2pdf.in_to_pt(width_in), img2pdf.in_to_pt(height_in))
     )
-    tb = img2pdf.in_to_pt(bleed_in)
+    tb = img2pdf.in_to_pt(trim_inset_in)
     out = io.BytesIO()
     img2pdf.convert(
         embed_bytes,
@@ -200,10 +234,16 @@ def _read_image_bytes(req):
     b64 = js.get("image_base64")
     if b64:
         try:
-            return base64.b64decode(b64)
+            return base64.b64decode(b64, validate=True)
         except Exception:
             return None
     return None
+
+
+def _as_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
 # --- static frontend (single-origin deploy: this process serves web/ too) ---

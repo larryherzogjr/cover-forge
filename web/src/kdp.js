@@ -171,6 +171,19 @@ export function snap(value, targets, tol) {
   return value;
 }
 
+// Axis-aligned rectangle helpers shared by the live print pre-flight. Rects use
+// {x,y,w,h} in any consistent unit (preview pixels or inches).
+export function rectContains(outer, inner, tolerance = 0) {
+  return inner.x >= outer.x - tolerance && inner.y >= outer.y - tolerance &&
+    inner.x + inner.w <= outer.x + outer.w + tolerance &&
+    inner.y + inner.h <= outer.y + outer.h + tolerance;
+}
+
+export function rectIntersects(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+    a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
 /* ---------- gradient geometry (pure) ---------- */
 // Endpoints for a linear gradient that spans a w*h box at angleDeg, measured
 // from the x-axis: 0 = left->right, 90 = top->bottom. The line is extended so

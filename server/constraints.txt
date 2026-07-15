@@ -1,0 +1,8 @@
+# Known-good direct dependency set. requirements.txt includes this file so local
+# installs and CI resolve the same core versions; optional rembg/onnx packages
+# remain host-specific because their versions depend on the GPU/CUDA runtime.
+Flask==3.1.3
+flask-cors==6.0.5
+gunicorn==23.0.0
+Pillow==11.3.0
+img2pdf==0.6.3

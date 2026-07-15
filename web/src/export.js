@@ -4,7 +4,7 @@
 // /api/export-pdf). Server calls degrade gracefully.
 
 import { S } from "./state.js";
-import { dims, DPI, BLEED } from "./kdp.js";
+import { dims, DPI } from "./kdp.js";
 import { drawCover } from "./render.js";
 import { loadFonts } from "./fonts.js";
 
@@ -18,8 +18,13 @@ const usedFonts = () => [
 // API origin for the server-only features (PDF, bg-removal). In dev the static
 // site is on :8080 and Flask on :5004; in prod nginx proxies same-origin /api.
 // Override with window.CF_API_BASE if your setup differs.
-const API_BASE = (typeof window !== "undefined" && window.CF_API_BASE) ||
-  (typeof location !== "undefined" && location.port === "8080" ? "http://127.0.0.1:5004" : "");
+const configuredApiBase = typeof window !== "undefined" && typeof window.CF_API_BASE === "string"
+  ? window.CF_API_BASE
+  : null;
+const devApiBase = typeof location !== "undefined" && ["8080", "8090"].includes(location.port)
+  ? `${location.protocol}//${location.hostname}:5004`
+  : "";
+const API_BASE = configuredApiBase ?? devApiBase;
 
 // Print wrap: exact KDP pixel dimensions, no guide overlay.
 export async function exportWrap() {
@@ -60,16 +65,25 @@ function dl(canvas, name, type = "image/png", quality) {
   }, type, quality);
 }
 
+function canvasBlob(canvas, type = "image/png", quality) {
+  return new Promise((resolve, reject) => canvas.toBlob(
+    (blob) => blob ? resolve(blob) : reject(new Error("could not encode the canvas")),
+    type,
+    quality,
+  ));
+}
+
 // Background removal via the server. Posts an image data URL, returns the
 // cutout (RGBA PNG) as a data URL. Throws on failure so the caller can degrade
 // (the server feature is optional — see /api/remove-bg). The caller turns the
 // returned cutout into an overlay layer.
 export async function removeBackground(imageDataUrl) {
-  const image_base64 = imageDataUrl.split(",")[1];
+  const imageBlob = await (await fetch(imageDataUrl)).blob();
+  const form = new FormData();
+  form.append("image", imageBlob, "background-image");
   const res = await fetch(API_BASE + "/api/remove-bg", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ image_base64 }),
+    body: form,
   });
   if (!res.ok) {
     let detail = res.status + " " + res.statusText;
@@ -86,20 +100,26 @@ function dlBlob(blob, name) {
 }
 
 // Print-grade PDF via the server: render the 300-DPI wrap, post it, download the
-// returned flattened PDF (MediaBox = full wrap, TrimBox inset by bleed). Throws
+// returned flattened PDF (MediaBox = full wrap, TrimBox inset to the physical
+// cover edge: paperback bleed or hardcover turn-in). Throws
 // on failure so the caller can degrade gracefully (the PNG export still works
-// fully offline). Returns { cmykMode } from the response for a user notice.
+// without the API; uncached web fonts need network access). Returns server
+// pre-flight headers for a user notice.
 export async function exportPDF({ cmyk = false } = {}) {
   await loadFonts(usedFonts());
   const d = dims(S);
   const c = document.createElement("canvas"); c.width = d.pxW; c.height = d.pxH;
   drawCover(c.getContext("2d"), DPI, false);
-  const png_base64 = c.toDataURL("image/png").split(",")[1];
+  const form = new FormData();
+  form.append("image", await canvasBlob(c), "cover-wrap.png");
+  form.append("width_in", String(d.fullW));
+  form.append("height_in", String(d.fullH));
+  form.append("trim_inset_in", String(d.edge));
+  form.append("cmyk", String(cmyk));
 
   const res = await fetch(API_BASE + "/api/export-pdf", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ png_base64, width_in: d.fullW, height_in: d.fullH, bleed_in: BLEED, cmyk }),
+    body: form,
   });
   if (!res.ok) {
     let detail = res.status + " " + res.statusText;
@@ -108,5 +128,5 @@ export async function exportPDF({ cmyk = false } = {}) {
   }
   const blob = await res.blob();
   dlBlob(blob, `kdp-wrap_${S.trimW}x${S.trimH}_${S.pages}pg_${d.pxW}x${d.pxH}_${cmyk ? "cmyk" : "rgb"}.pdf`);
-  return { cmykMode: res.headers.get("X-CMYK-Mode") };
+  return { cmykMode: res.headers.get("X-CMYK-Mode"), dimMatch: res.headers.get("X-Dim-Match") };
 }

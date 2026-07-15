@@ -15,7 +15,7 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 
 - [x] **Effective-DPI check** on the placed background: compute `nativePx ÷ placedInches`; warn (non-blocking) below 300, hard-warn below 200. Client-side.
 - [x] **CMYK shift warning**: flag highly saturated fills/text colors that will shift on press; one-line non-blocking notice. Client-side.
-- [x] **PDF export** via the API: client posts the 300-DPI render + trim/bleed dims; server returns a flattened print PDF (MediaBox = full wrap, TrimBox inset by bleed). See `server/app.py` `/api/export-pdf`.
+- [x] **PDF export** via the API: client posts the 300-DPI render + physical cover-edge inset; server returns a flattened print PDF (MediaBox = full wrap, TrimBox inset by paperback bleed or hardcover turn-in). See `server/app.py` `/api/export-pdf`.
 - [x] **CMYK PDF** option: `cmyk:true` converts RGB→CMYK via `ImageCms` + `CF_CMYK_ICC` (or naive fallback, flagged in `X-CMYK-Mode`). PDF/X-1a via Ghostscript documented as the optional strict path (`docs/DEPLOYMENT.md`).
 
 ## M2 — Design parity (Tier 2, all client-side)
@@ -41,6 +41,18 @@ issue-ready. The seed snippet at the bottom turns these into issues with `gh`.
 - [ ] Per-trim barcode-position nuance if Amazon's placement varies by size.
 - [x] Keyboard nudging for the selected element (arrows = 0.01″, Shift = 0.1″; front blocks and overlays), Esc to deselect, Delete to remove a selected overlay. Drag already snaps to the safe-area guides. (Dedicated align buttons still optional.)
 - [ ] Optional own-barcode placement (for authors bringing their own ISBN).
+
+## M5 — Production hardening (done)
+
+- [x] Binding-specific hardcover snapping, front-image zoom geometry, and PDF
+  TrimBox inset (no paperback bleed constants in hardcover paths).
+- [x] Project schema/version/data-URL validation, bounded file sizes, atomic
+  image decoding, and awaited load errors.
+- [x] Render-bound pre-flight for safe-area and barcode collisions; expanded
+  CMYK warnings for gradients, optional blocks, and active outlines.
+- [x] Multipart API uploads, 64 MB configurable ceiling, and JSON 413 errors.
+- [x] Secure `CF_WEB_DIR=` API-only behavior with regression coverage.
+- [x] GitHub CI and tested direct dependency constraints.
 
 ## Out of scope (unless the goal changes)
 

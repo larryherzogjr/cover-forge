@@ -1,3 +1,7 @@
+# Pin the tested core versions while keeping the dependency declarations below
+# readable. Update constraints.txt deliberately after running both test suites.
+-c constraints.txt
+
 # Core
 Flask>=3.0
 flask-cors>=4.0

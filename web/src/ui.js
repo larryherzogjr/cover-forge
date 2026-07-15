@@ -3,13 +3,17 @@
 // geometry lives in kdp.js; pixels in render.js; this module connects controls
 // to state and re-renders.
 
-import { S, serialize, restore, resetProject, AUTOSAVE_KEY } from "./state.js";
 import {
-  dims, spineTextAllowed, SPINE_TEXT_MIN_PAGES, BLEED, SAFE, snap,
-  imageRegion, effectiveDPI, dpiSeverity, cmykRisk, DPI_MIN, DPI_FLOOR,
+  S, serialize, restore, resetProject, validateProject,
+  AUTOSAVE_KEY, MAX_PROJECT_FILE_BYTES,
+} from "./state.js";
+import {
+  dims, safeArea, spineTextAllowed, SPINE_TEXT_MIN_PAGES, snap,
+  imageRegion, effectiveDPI, dpiSeverity, DPI_MIN, DPI_FLOOR,
   HC_PAGE_MIN, HC_PAGE_MAX, normalizeHex,
 } from "./kdp.js";
-import { render, getPrevScale, rotateBy, pickAt, getHitBox, isBackBlock } from "./render.js";
+import { render, getPrevScale, rotateBy, pickAt, getHitBox } from "./render.js";
+import { isBackBlock, layoutIssues, riskyColorLabels } from "./preflight.js";
 import { exportWrap, exportEbook, exportPDF, removeBackground } from "./export.js";
 import { ensureFontsLoaded, loadFonts, populateFontSelect } from "./fonts.js";
 
@@ -46,8 +50,12 @@ function autosave() {
     try {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(serialize()));
     } catch (_) {
-      // quota (large image) — keep at least the design without the image
-      try { const j = serialize(); j.image = null; localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(j)); } catch (__) { /* give up */ }
+      // quota (large images) — keep the non-binary design. Overlay metadata is
+      // not useful without its embedded src, so omit those layers atomically.
+      try {
+        const j = serialize(); j.image = null; j.state.overlays = [];
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(j));
+      } catch (__) { /* give up */ }
     }
   }, 600);
 }
@@ -63,8 +71,10 @@ async function cacheLoad(src) {
 // Intern data-URL strings so identical images across snapshots share one copy.
 const srcPool = new Map();
 const intern = (s) => { if (s == null) return s; if (!srcPool.has(s)) srcPool.set(s, s); return srcPool.get(s); };
+const srcIds = new Map(); let nextSrcId = 1;
+const sourceId = (s) => { if (s == null) return null; if (!srcIds.has(s)) srcIds.set(s, nextSrcId++); return srcIds.get(s); };
 function snapshot() {
-  const snap = JSON.parse(JSON.stringify(serialize()));
+  const snap = serialize();
   snap.image = intern(snap.image);
   for (const o of snap.state.overlays || []) o.src = intern(o.src);
   return snap;
@@ -72,8 +82,8 @@ function snapshot() {
 // Cheap change-signature: design state + image identity, excluding binary bulk.
 function signature(snap) {
   const st = snap.state;
-  const lite = { ...st, overlays: (st.overlays || []).map((o) => ({ ...o, src: o.src ? o.src.length : null })) };
-  return JSON.stringify({ s: lite, i: snap.image ? snap.image.length : 0 });
+  const lite = { ...st, overlays: (st.overlays || []).map((o) => ({ ...o, src: sourceId(o.src) })) };
+  return JSON.stringify({ s: lite, i: sourceId(snap.image) });
 }
 const hist = { past: [], future: [], current: null, curSig: "" };
 function commitHistory() {
@@ -117,14 +127,20 @@ function setNotice(el, severity, html) {
   el.classList.add("show");
   el.innerHTML = html;
 }
+const escapeHTML = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[char]));
+
 function updateNotices() {
   // Effective DPI of the placed background image (invariant: native px / placed in).
   const dn = $("dpiNote");
+  let dpiProblem = false;
   if (S.img) {
     const d = dims(S);
     const r = imageRegion(d, S.fit);
     const dpi = Math.round(effectiveDPI({ imgW: S.img.width, imgH: S.img.height, regionWin: r.w, regionHin: r.h, zoom: S.imgScale }));
     const sev = dpiSeverity(dpi);
+    dpiProblem = sev !== "ok";
     const msg = sev === "ok"
       ? `Effective resolution <b>${dpi}</b> DPI — at or above the ${DPI_MIN} DPI print minimum.`
       : sev === "warn"
@@ -138,17 +154,23 @@ function updateNotices() {
 
   // CMYK gamut risk across the cover's colors.
   const cn = $("cmykNote");
-  const labels = [["title", S.title.color], ["author", S.author.color], ["spine", S.spine.color], ["back text", S.back.color], ["base color", S.bg]];
-  const risky = labels.filter(([, hex]) => cmykRisk(hex)).map(([name]) => name);
+  const risky = riskyColorLabels(S);
   if (risky.length) {
     setNotice(cn, "warn",
       `Saturated color${risky.length > 1 ? "s" : ""} (<b>${risky.join(", ")}</b>) may shift noticeably converting RGB→CMYK on press. Consider muting, and order a proof.`);
-    $("preflightOk").style.display = "none";
   } else {
     setNotice(cn, "", null);
     cn.classList.remove("show");
-    $("preflightOk").style.display = "block";
   }
+
+  const ln = $("layoutNote"), issues = layoutIssues(S, dims(S), getPrevScale(), getHitBox);
+  if (issues.length) {
+    setNotice(ln, "bad", `Layout check: ${issues.map(escapeHTML).join("; ")}. Reposition the flagged element before export.`);
+  } else {
+    setNotice(ln, "", null);
+    ln.classList.remove("show");
+  }
+  $("preflightOk").style.display = (!dpiProblem && !risky.length && !issues.length) ? "block" : "none";
 }
 
 /* ---------- readouts ---------- */
@@ -160,6 +182,9 @@ function updateReadout() {
   $("oEdge").textContent = d.edge;
   $("oSafe").textContent = d.safe;
   $("oEdgeK").textContent = d.hc ? "Wrap (turn-in)" : "Bleed (each edge)";
+  $("geometryNote").textContent = d.hc
+    ? "Case wrap = 0.51 + back + spine + front + 0.51 wide, trim + 1.02 tall. Paste KDP's exact case-spine value before export and order a proof."
+    : "Wrap = 0.125 + back + spine + front + 0.125 wide, trim + 0.25 tall. Reconcile the final number against KDP's cover calculator and order a proof.";
   const ok = spineTextAllowed(S.pages);
   $("oSpineText").innerHTML = ok
     ? '<span style="color:var(--ok)">allowed</span>'
@@ -474,7 +499,7 @@ $("removeBg").onclick = async () => {
     await addOverlayFromSrc(cutout, 0.6); // place the cut-out subject as an overlay
     setNotice(st, "ok", "Background removed — added as an overlay layer; drag to position.");
   } catch (e) {
-    setNotice(st, "bad", `Background removal unavailable: ${e.message}. It needs the Cover Forge API with rembg (the GPU box) — see server/. Everything else works offline.`);
+    setNotice(st, "bad", `Background removal unavailable: ${escapeHTML(e.message)}. It needs the Cover Forge API with rembg (the GPU box) — see server/. Everything else works offline.`);
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
@@ -489,13 +514,14 @@ $("expPdf").onclick = async () => {
   btn.disabled = true; btn.textContent = "Generating PDF…";
   st.classList.remove("show");
   try {
-    const { cmykMode } = await exportPDF({ cmyk });
+    const { cmykMode, dimMatch } = await exportPDF({ cmyk });
     let msg = "Print PDF downloaded.";
+    if (dimMatch === "off") msg += " The API reported a 300-DPI dimension mismatch; verify the PDF before upload.";
     if (cmyk && cmykMode === "naive") msg += " CMYK used a built-in conversion (no ICC profile on the server) — order a proof before a print run.";
     else if (cmyk && cmykMode === "icc") msg += " CMYK converted with the server's ICC profile.";
     setNotice(st, "ok", msg);
   } catch (e) {
-    setNotice(st, "bad", `PDF export failed: ${e.message}. The PNG wrap above still works fully offline — the PDF needs the Cover Forge API running (see <span class="mono">server/</span>).`);
+    setNotice(st, "bad", `PDF export failed: ${escapeHTML(e.message)}. The PNG wrap above still works without the API — the PDF needs the Cover Forge API running (see <span class="mono">server/</span>).`);
   } finally {
     btn.disabled = false; btn.textContent = label;
   }
@@ -527,8 +553,10 @@ function dragSelected(e) {
     rerender(); return;
   }
   const o = S[drag.token];
-  const H = d.fullH * scale, x0 = (isBackBlock(drag.token) ? d.backX : d.frontX) * scale, w = S.trimW * scale, tol = 10;
-  const topP = (BLEED + SAFE) / d.fullH * 100, botP = (d.fullH - BLEED - SAFE) / d.fullH * 100;
+  const side = isBackBlock(drag.token) ? "back" : "front";
+  const H = d.fullH * scale, x0 = (side === "back" ? d.backX : d.frontX) * scale, w = S.trimW * scale, tol = 10;
+  const safe = safeArea(d, side);
+  const topP = safe.y / d.fullH * 100, botP = (safe.y + safe.h) / d.fullH * 100;
   o.x = clamp(snap((ax - x0) / w, [0.5], tol / w), 0, 1);
   o.y = clamp(snap(ay / H * 100, [topP, 50, botP], tol / H * 100), 0, 100);
   syncBlockYSlider(drag.token);
@@ -593,7 +621,7 @@ cv.addEventListener("wheel", (e) => {
   const sx = cv.width / r.width, sy = cv.height / r.height;
   const px = (e.clientX - r.left) * sx, py = (e.clientY - r.top) * sy, scale = getPrevScale(), d = dims(S);
   let rx, ry, rw, rh;
-  if (S.fit === "front") { rx = d.frontX * scale; ry = 0; rw = (S.trimW + BLEED) * scale; rh = d.fullH * scale; }
+  if (S.fit === "front") { const region = imageRegion(d, "front"); rx = d.frontX * scale; ry = 0; rw = region.w * scale; rh = region.h * scale; }
   else { rx = 0; ry = 0; rw = d.fullW * scale; rh = d.fullH * scale; }
   const ir = S.img.width / S.img.height, br = rw / rh; let bw, bh;
   if (ir > br) { bh = rh; bw = rh * ir; } else { bw = rw; bh = rw / ir; }
@@ -705,7 +733,7 @@ function syncUI() {
   rerender();
 }
 
-const setProjStatus = (sev, msg) => setNotice($("projStatus"), sev, msg);
+const setProjStatus = (sev, msg) => setNotice($("projStatus"), sev, escapeHTML(msg));
 
 function downloadJSON(obj, name) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
@@ -753,21 +781,41 @@ function startNewProject() {
 
 // Apply a parsed project: design fields synchronously, image asynchronously.
 async function applyProject(parsed) {
-  const dataUrl = restore(parsed);
-  if (dataUrl) {
-    S.img = await cacheLoad(dataUrl);
-    if (S.img) { $("thumb").classList.add("show"); $("thumbImg").src = dataUrl; cv.style.cursor = "grab"; extractPalette(S.img); }
+  // Validate and decode every embedded image before mutating S. A bad file can
+  // therefore fail cleanly instead of leaving half of the new project applied.
+  const project = validateProject(parsed);
+  const background = project.image ? await cacheLoad(project.image) : null;
+  if (project.image && !background) throw new Error("the embedded background image could not be decoded");
+  const overlayImages = new Map();
+  for (const ov of project.state.overlays || []) {
+    const image = await cacheLoad(ov.src);
+    if (!image) throw new Error(`overlay ${ov.id} could not be decoded`);
+    overlayImages.set(ov.id, image);
+  }
+
+  restore(project);
+  S.img = background;
+  if (S.img) {
+    $("thumb").classList.add("show"); $("thumbImg").src = project.image; cv.style.cursor = "grab"; extractPalette(S.img);
   } else {
     $("thumb").classList.remove("show"); S.palette = []; renderSwatches(); cv.style.cursor = "default";
   }
-  // reconstruct overlay images from their saved data URLs (cached for undo/redo)
-  for (const ov of S.overlays) { if (ov.src && !ov.img) ov.img = await cacheLoad(ov.src); }
+  for (const ov of S.overlays) ov.img = overlayImages.get(ov.id);
   syncUI();
 }
 function loadProjectFile(f) {
+  if (f.size > MAX_PROJECT_FILE_BYTES) {
+    setProjStatus("bad", `Could not load: project files are limited to ${Math.round(MAX_PROJECT_FILE_BYTES / 1024 / 1024)} MB.`);
+    return;
+  }
   const r = new FileReader();
-  r.onload = () => {
-    try { applyProject(JSON.parse(r.result)); setProjStatus("ok", "Project loaded."); }
+  r.onload = async () => {
+    try {
+      await applyProject(JSON.parse(r.result));
+      clearTimeout(_commitTimer);
+      initHistory();
+      setProjStatus("ok", "Project loaded.");
+    }
     catch (err) { setProjStatus("bad", "Could not load: " + err.message); }
   };
   r.onerror = () => setProjStatus("bad", "Could not read the file.");

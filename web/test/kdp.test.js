@@ -11,6 +11,7 @@ import {
   dims, safeArea, barcodeBox, spineTextAllowed, fontPx,
   imageRegion, effectiveDPI, dpiSeverity,
   normalizeHex, hexToRgb, rgbToHsv, cmykRisk, gradientLine, snap,
+  rectContains, rectIntersects,
   HC_WRAP, HC_SAFE, HC_HINGE, HC_BARCODE_BOTTOM, HC_PAGE_MIN, HC_PAGE_MAX,
 } from "../src/kdp.js";
 
@@ -170,6 +171,13 @@ test("imageRegion: wrap covers the full wrap; front covers trim+bleed", () => {
   near(front.w, 6 + BLEED); near(front.h, d.fullH);
 });
 
+test("imageRegion uses the hardcover turn-in for front-only artwork", () => {
+  const d = dims({ trimW: 6, trimH: 9, pages: 300, paper: PAPER.white, binding: "hardcover" });
+  const front = imageRegion(d, "front");
+  near(front.w, 6 + HC_WRAP);
+  near(front.h, d.fullH);
+});
+
 test("effectiveDPI: native px over placed inches, aspect-preserved", () => {
   // Image exactly the wrap's aspect, placed at zoom 1: dpi = imgW / fullW.
   const d = dims({ trimW: 6, trimH: 9, pages: 220, paper: PAPER.white });
@@ -211,6 +219,15 @@ test("snap pulls to the nearest target within tolerance", () => {
   assert.equal(snap(49, [4, 50, 96], 2), 50);   // nearest target wins
   assert.equal(snap(4.05, [4, 50, 96], 2), 4);
   assert.equal(snap(75, [4, 50, 96], 2), 75);   // none in range
+});
+
+test("rectangle helpers detect safe containment and barcode intersections", () => {
+  const safe = { x: 10, y: 10, w: 80, h: 80 };
+  assert.equal(rectContains(safe, { x: 10, y: 20, w: 30, h: 40 }), true);
+  assert.equal(rectContains(safe, { x: 9.5, y: 20, w: 30, h: 40 }), false);
+  assert.equal(rectContains(safe, { x: 9.5, y: 20, w: 30, h: 40 }, 1), true);
+  assert.equal(rectIntersects({ x: 0, y: 0, w: 20, h: 20 }, { x: 19, y: 19, w: 5, h: 5 }), true);
+  assert.equal(rectIntersects({ x: 0, y: 0, w: 20, h: 20 }, { x: 20, y: 20, w: 5, h: 5 }), false);
 });
 
 test("gradientLine spans the box at 0/90/45 degrees", () => {

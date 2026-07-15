@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test frontend modules
+        working-directory: web
+        run: npm test
+      - name: Check frontend syntax
+        working-directory: web
+        run: npm run check
+
+  backend:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            server/requirements.txt
+            server/constraints.txt
+      - name: Install API dependencies
+        working-directory: server
+        run: pip install -r requirements.txt
+      - name: Test API
+        working-directory: server
+        run: python -m unittest -v

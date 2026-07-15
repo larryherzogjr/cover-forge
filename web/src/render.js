@@ -6,6 +6,7 @@
 
 import { S } from "./state.js";
 import { dims, safeArea, barcodeBox, spineTextAllowed, fontPx, gradientLine, hexToRgb, HC_HINGE, DPI } from "./kdp.js";
+import { BACK_BLOCKS, FRONT_BLOCKS, isBackBlock } from "./preflight.js";
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -20,10 +21,8 @@ export const getPrevScale = () => PREV_SCALE;
 // Draggable front blocks, in draw order (back-to-front). Bounding boxes
 // (preview-scale px) are recorded during the live render so ui.js can hit-test
 // pointer events against them. Add a block here + in state.js to make it real.
-export const FRONT_BLOCKS = ["series", "title", "subtitle", "pullquote", "author"];
-export const BACK_BLOCKS = ["tagline", "bio"];
+export { BACK_BLOCKS, FRONT_BLOCKS, isBackBlock };
 const TEXT_BLOCKS = [...FRONT_BLOCKS, ...BACK_BLOCKS];
-export const isBackBlock = (token) => BACK_BLOCKS.includes(token);
 const hitBoxes = {};                 // token -> {x,y,w,h} (preview px)
 export const getHitBox = (token) => hitBoxes[token];
 const inBox = (b, px, py) => b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h;
@@ -119,7 +118,16 @@ export function drawWrapText(ctx, o, box, scale, kind, recordHits) {
   const strokePx = o.stroke && o.stroke.width ? fontPx(o.stroke.width, scale) : 0;
   if (recordHits) {
     const maxW = Math.max(1, ...lines.map((l) => ctx.measureText(l).width));
-    hitBoxes[kind] = { x: cx2 - maxW / 2, y: cy - lines.length * lh / 2, w: maxW, h: lines.length * lh };
+    const shadowPad = o.shadow
+      ? Math.max(Math.abs(fontPx(o.shadowDX || 0, scale)), Math.abs(fontPx(o.shadowDY || 0, scale))) + fontPx(o.shadowBlur || 0, scale)
+      : 0;
+    const pad = Math.max(strokePx / 2, shadowPad);
+    hitBoxes[kind] = {
+      x: cx2 - maxW / 2 - pad,
+      y: cy - lines.length * lh / 2 - pad,
+      w: maxW + 2 * pad,
+      h: lines.length * lh + 2 * pad,
+    };
   }
   let y = cy - (lines.length - 1) * lh / 2;
   for (const ln of lines) {

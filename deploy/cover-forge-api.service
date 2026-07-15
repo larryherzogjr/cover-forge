@@ -13,7 +13,7 @@ Environment=CF_PORT=5004
 # nginx proxying /api on the SAME origin as the frontend, requests are server-to-
 # server and CORS never applies, so this can stay as the site origin (or *).
 Environment=CF_ALLOWED_ORIGIN=https://coverforge.example.lan
-Environment=CF_MAX_UPLOAD_MB=25
+Environment=CF_MAX_UPLOAD_MB=64
 # Background removal model (only used once rembg + onnxruntime are installed):
 Environment=CF_REMBG_MODEL=u2net
 # Optional accurate CMYK PDFs — point at a CMYK ICC profile if you have one:

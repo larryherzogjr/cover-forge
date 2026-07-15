@@ -4,6 +4,10 @@ Mirrors the owner's existing pattern (Flask app under `/opt`, gunicorn, systemd,
 nginx reverse proxy on Proxmox). The frontend is static; the API is a small Flask
 service. Background removal should run where the GPU is.
 
+Use Python 3.11 or newer. `server/requirements.txt` automatically applies the
+tested direct-version pins in `server/constraints.txt`; update those pins only
+after running both frontend and backend suites.
+
 ## Layout on the server
 
 ```
@@ -24,8 +28,8 @@ service. Background removal should run where the GPU is.
 Simplest option, and the one to use when the box already runs apps on direct
 ports (e.g. llama.cpp on :3000). One gunicorn process serves the static `web/`
 **and** `/api/*` on a single LAN port — same origin, no CORS, no nginx. The Flask
-app auto-serves `web/` whenever it finds it next to `server/` (override/disable
-with `CF_WEB_DIR`).
+app auto-serves `web/` whenever it finds it next to `server/`. Set `CF_WEB_DIR`
+to an alternate root, or to an empty value for API-only mode.
 
 ```bash
 sudo mkdir -p /opt/cover-forge && sudo chown "$USER" /opt/cover-forge
@@ -44,7 +48,8 @@ pip install "rembg[gpu]"          # background removal; or onnxruntime (CPU), or
 ```
 
 Open `http://<box>:5004/`. The frontend resolves its API calls to the same
-origin automatically (any port except 8080). For a service, use
+origin automatically. Development static servers on ports 8080 and 8090 resolve
+the API on the same hostname at port 5004. For a service, use
 `deploy/cover-forge-api.service` with the `0.0.0.0:5004` `ExecStart` (commented in
 the file). Bound to `0.0.0.0` it's reachable on the LAN (like llama.cpp on
 :3000); add a `ufw` rule if you want to restrict who can reach it.
@@ -95,11 +100,14 @@ sudo mkdir -p /opt/cover-forge && # copy the repo's web/ to /opt/cover-forge/web
   to-server.
 
 If you'd rather not run nginx at all, the simplest single-box option is to serve
-everything from the inference box's Flask process (it already runs there) — but
-that needs Flask to serve `web/` statically, which the API doesn't do yet; the
-nginx front door above is the supported path.
+everything from the inference box's Flask process; this is supported whenever
+the adjacent `web/` directory exists.
 
 ## API service (systemd + gunicorn)
+
+The supplied service and nginx examples allow 64 MB uploads, large enough for
+the worst-case 300-DPI wrap without base64 expansion. Keep
+`CF_MAX_UPLOAD_MB` and nginx's `client_max_body_size` aligned if you change it.
 
 ```bash
 cd /opt/cover-forge/server
@@ -145,7 +153,8 @@ model on service start so the first request isn't slow.
 
 - The simple path (Pillow + img2pdf) yields a correct-dimension RGB or CMYK PDF.
   This is implemented in `/api/export-pdf`: MediaBox = exact wrap, TrimBox inset
-  by bleed, RGB embedded losslessly.
+  to the paperback trim or hardcover board edge, RGB embedded losslessly. The
+  browser sends the rendered PNG as multipart data to avoid base64 overhead.
 - **CMYK** (`cmyk:true` in the request): if `CF_CMYK_ICC` points to a CMYK ICC
   profile the server does a proper `ImageCms` sRGB→CMYK transform; otherwise it
   falls back to Pillow's naive `convert("CMYK")`. The mode is returned in the
@@ -157,8 +166,7 @@ model on service start so the first request isn't slow.
   Embed an appropriate CMYK ICC profile. Only worth it if KDP flags the simpler
   PDFs; start simple.
 
-## CI (optional, recommended)
+## CI
 
-A minimal GitHub Action: run `node --check` on the extracted frontend JS and
-`python -m compileall server/` on push. Add `pytest` once `kdp.js` logic has a
-Python or Node test mirror.
+`.github/workflows/ci.yml` runs the Node tests and syntax checks plus the API
+suite on Python 3.11 and 3.12 for every push and pull request.
